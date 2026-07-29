@@ -1727,7 +1727,30 @@ async def durumu_guncelle():
 async def on_ready():
     print(f"{bot.user} olarak giriş yapıldı!")
     durumu_guncelle.start() # Bot açıldığı an döngüyü başlatır
+from flask import Flask
+from threading import Thread
 
+app = Flask('')
+
+
+@app.route('/')
+def home():
+  schl = "Bot aktif ve çalışıyor!"
+  return schl
+
+
+def run():
+  app.run(host='0.0.0.0', port=8080)
+
+
+def web_sunucusunu_baslat():
+  t = Thread(target=run)
+  t.start()
+
+
+# Botu başlatmadan önce web sunucusunu tetikle
+if __name__ == '__main__':
+  web_sunucusunu_baslat()
 
 # --- BOTU BAŞLATMA ---
 bot.run(TOKEN)
