@@ -1,0 +1,52 @@
+{
+    "613708529119002624": {
+        "bakiye": 100000,
+        "son_gunluk": "2026-07-28T18:59:23.464979",
+        "meslek_bilgi": {
+            "meslek": "polis",
+            "son_degisim": 1785277093.211038,
+            "cezali": false,
+            "son_polis_islem": 1785277104.136613
+        }
+    },
+    "412972740069425152": {
+        "bakiye": 8000,
+        "son_gunluk": "2026-07-28T19:49:06.922466",
+        "meslek_bilgi": {}
+    },
+    "1017911854061854850": {
+        "bakiye": 220800,
+        "son_gunluk": null,
+        "meslek_bilgi": {}
+    },
+    "719604705860386886": {
+        "bakiye": 1000,
+        "son_gunluk": "2026-07-28T19:49:11.408448",
+        "meslek_bilgi": {}
+    },
+    "1136343312677228775": {
+        "bakiye": 161788,
+        "son_gunluk": "2026-07-29T14:37:48.955569",
+        "meslek_bilgi": {
+            "meslek": "polis",
+            "son_degisim": 1785277080.078897,
+            "cezali": false,
+            "son_polis_islem": 1785326898.712812
+        }
+    },
+    "1531964199008469073": {
+        "bakiye": 200500,
+        "son_gunluk": null,
+        "meslek_bilgi": {}
+    },
+    "1448417538206597343": {
+        "bakiye": 1125,
+        "son_gunluk": null,
+        "meslek_bilgi": {
+            "meslek": "polis",
+            "son_degisim": 1785325891.74988,
+            "cezali": false,
+            "son_polis_islem": 1785325897.158718
+        }
+    }
+}
