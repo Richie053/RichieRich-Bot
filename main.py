@@ -738,7 +738,7 @@ async def rulet(ctx, renk: str, miktar: int):
         elif not vc.is_playing():
             await vc.move_to(ses_kanali)
 
-    ses_dosyasi_yolu = r"C:\Users\meyil\OneDrive\Masaüstü\Bot\rulet_sesi.m4a"
+    ses_dosyasi_yolu = "rulet_sesi.m4a"
 
     if vc and os.path.exists(ses_dosyasi_yolu):
         try:
