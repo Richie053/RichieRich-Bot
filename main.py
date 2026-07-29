@@ -1711,69 +1711,6 @@ async def slowmode(ctx, saniye: int = 0):
         await ctx.send(f"Bir hata oluştu: {e}")
 
 
-# --- MÜZİK ÇALMA KOMUTLARI ---
-@bot.command(
-    name="play",
-    description="YouTube'dan arattığın şarkıyı ses kanalında çalar.",
-)
-async def play(ctx, *, isim: str):
-    if not ctx.author.voice or not ctx.author.voice.channel:
-        await ctx.send("❌ Önce bir ses kanalına girmelisin!")
-        return
-
-    ses_kanali = ctx.author.voice.channel
-    if ctx.guild.voice_client is None:
-        vc = await ses_kanali.connect()
-    else:
-        vc = ctx.guild.voice_client
-
-    if vc.is_playing():
-        vc.stop()
-
-    mesaj = await ctx.send(f"🔍 **{isim}** YouTube'da aranıyor...")
-
-    ytdl_opts = {
-        "format": "bestaudio/best",
-        "noplaylist": True,
-        "default_search": "ytsearch",
-        "quiet": True,
-    }
-    ffmpeg_opts = {
-        "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-        "options": "-vn",
-    }
-
-    try:
-        with yt_dlp.YoutubeDL(ytdl_opts) as ytdl:
-            info = ytdl.extract_info(f"ytsearch:{isim}", download=False)
-            if "entries" in info and len(info["entries"]) > 0:
-                bilgi = info["entries"][0]
-            else:
-                await mesaj.edit(content="❌ Aradığınız şarkı bulunamadı!")
-                return
-
-            url = bilgi["url"]
-            baslik = bilgi.get("title", "Bilinmeyen Şarkı")
-
-        source = discord.FFmpegPCMAudio(url, **ffmpeg_opts)
-        vc.play(source)
-        await mesaj.edit(content=f"🎵 Şu anda çalınıyor: **{baslik}**")
-
-    except Exception as e:
-        await mesaj.edit(content=f"🚨 Şarkı çalınırken hata oluştu: {e}")
-
-
-@bot.command(
-    name="stop",
-    description="Çalan müziği durdurur ve botu kanaldan çıkarır.",
-)
-async def stop(ctx):
-    if ctx.guild.voice_client:
-        await ctx.guild.voice_client.disconnect()
-        await ctx.send("⏹️ Müzik durduruldu ve kanaldan çıkıldı.")
-    else:
-        await ctx.send("❌ Zaten bir ses kanalında değilim!")
-
         # Döngüye girecek durumların listesi
 richie_rich_durumlari = itertools.cycle([
     "Rulet Oynuyor 🎰",
