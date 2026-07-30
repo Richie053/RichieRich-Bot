@@ -1718,7 +1718,7 @@ richie_rich_durumlari = itertools.cycle([
     "Aviator Oynuyor ✈️"
 ])
 
-@tasks.loop(hours=3) # Her 3 saatte bir durumu değiştirir
+@tasks.loop(minutes=10) # Her 10 dakkada bir durumu değiştirir
 async def durumu_guncelle():
     yeni_durum = next(richie_rich_durumlari)
     await bot.change_presence(activity=discord.Game(name=yeni_durum))
