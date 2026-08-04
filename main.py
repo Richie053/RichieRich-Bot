@@ -422,11 +422,11 @@ async def seviye_paneli(ctx):
         value=(
             "• **Her Level:** `500 Coin`\n"
             "• **Level 5, 15, 25, 35, 45:** `Mystery Box` 🎁\n"
-            "• **Level 10:** `Copper` Rolü 🟫 [🧱 Bakır Blok]\n"
-            "• **Level 20:** `Silver` Rolü ⬜ [⛓️ Demir Ingot]\n"
-            "• **Level 30:** `Gold` Rolü 🟨 [🪙 Altın Ingot]\n"
-            "• **Level 40:** `Emerald` Rolü 🟩 [🟢 Zümrüt]\n"
-            "• **Level 50:** `Diamond` Rolü 🔷 [💎 Elmas]"
+            "• **Level 10:** `Copper` Rolü \n"
+            "• **Level 20:** `Silver` Rolü \n"
+            "• **Level 30:** `Gold` Rolü \n"
+            "• **Level 40:** `Emerald` Rolü \n"
+            "• **Level 50:** `Diamond` Rolü "
         ),
         inline=False
     )
