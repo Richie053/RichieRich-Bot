@@ -1048,4 +1048,498 @@ async def aviator(ctx, miktar: int = None):
             embed.color = discord.Color.red()
             embed.description = (
                 f"Plane flew away at `{patlama_noktasi}x`.\n\n"
-                f"```text\n 💥 BOOM! | ✈️💨 (Disappeared)\n
+                f"```text\n 💥 BOOM! | ✈️💨 (Disappeared)\n```\n"
+                f"💸 **Lost:** `{miktar:,} Coin`\n"
+                f"🏦 **Remaining Wallet:** `{COINLER[user_id]:,} Coin`"
+            )
+            await mesaj.edit(embed=embed, view=None)
+
+    except Exception as e:
+        print(f"Aviator error: {e}")
+    finally:
+        DEVAM_EDEN_AVIATORLER.discard(user_id)
+
+
+# ==========================================
+# 8. MESLEK SİSTEMİ (SEVİYE KISITLAMALI)
+# ==========================================
+
+async def kanal_kontrol(ctx):
+    if "meslekler" not in ctx.channel.name.lower() and "jobs" not in ctx.channel.name.lower():
+        await ctx.send("❌ You can only use this command in the **🥼meslekler / 💼jobs** channel!")
+        return False
+    return True
+
+
+@bot.command(name="meslekler", aliases=["jobs"], description="Meslekleri listeler.")
+async def meslekler_komut(ctx):
+    if not await kanal_kontrol(ctx):
+        return
+
+    embed = discord.Embed(
+        title="🥼 Server Jobs Panel / Sunucu Meslekler Paneli",
+        description=(
+            "**TR:** Güncel meslekler, gereksinimler ve oranlar:\n"
+            "* Seçmek için: `!meslekseç <police/pilot/doctor>`\n"
+            "* İstifa: `!istifa`\n\n"
+            "**EN:** Updated jobs and requirements:\n"
+            "* Choose: `!joinjob <police/pilot/doctor>`\n"
+            "* Resign: `!quitjob`"
+        ),
+        color=discord.Color.blue(),
+    )
+    embed.add_field(name="👮 Police", value="Her seviye. (Kazan: +550 | Kaybet: -250)", inline=False)
+    embed.add_field(name="✈️ Pilot", value="Min **Level 10**. (Kazan: +1,750 | Kaybet: 10 Dakika Yasak)", inline=False)
+    embed.add_field(name="👨‍⚕️ Doctor", value="Min **Level 20**. (Kazan: +2,500 | Kaybet: -750 Coin)", inline=False)
+    await ctx.send(embed=embed)
+
+
+@bot.command(name="meslekseç", aliases=["joinjob"], description="Mesleğe girer.")
+async def mesleksec(ctx, *, meslek_adi: str):
+    if not await kanal_kontrol(ctx):
+        return
+
+    meslek_adi = meslek_adi.lower()
+    veri = kullanici_veri_al(ctx.author.id)
+    kullanici_level = veri["level"]
+
+    if meslek_adi not in GECERLI_MESLEKLER:
+        await ctx.send("❌ Invalid job! Options: `police`, `pilot`, `doctor`")
+        return
+
+    if meslek_adi == "pilot" and kullanici_level < 10:
+        await ctx.send(f"❌ You must be at least **Level 10** to choose Pilot! (Current: {kullanici_level})")
+        return
+    if meslek_adi == "doctor" and kullanici_level < 20:
+        await ctx.send(f"❌ You must be at least **Level 20** to choose Doctor! (Current: {kullanici_level})")
+        return
+
+    rol_mapping = {"police": "Police", "doctor": "Doctor", "pilot": "Pilot"}
+    rol_ismi = rol_mapping.get(meslek_adi, meslek_adi.capitalize())
+    hedef_rol = discord.utils.get(ctx.guild.roles, name=rol_ismi)
+
+    if not hedef_rol:
+        await ctx.send(f"⚠️ Role **{rol_ismi}** not found on server!")
+        return
+
+    for diger_meslek in GECERLI_MESLEKLER:
+        diger_rol_ismi = rol_mapping.get(diger_meslek, diger_meslek.capitalize())
+        diger_rol = discord.utils.get(ctx.guild.roles, name=diger_rol_ismi)
+        if diger_rol and diger_rol in ctx.author.roles:
+            try:
+                await ctx.author.remove_roles(diger_rol)
+            except Exception as e:
+                print(f"Old role removal error: {e}")
+
+    try:
+        await ctx.author.add_roles(hedef_rol)
+    except Exception as e:
+        await ctx.send(f"❌ Could not assign role: {e}")
+        return
+
+    user_id_str = str(ctx.author.id)
+    if user_id_str not in MESLEKLER_VERI:
+        MESLEKLER_VERI[user_id_str] = {}
+
+    MESLEKLER_VERI[user_id_str]["meslek"] = meslek_adi
+    MESLEKLER_VERI[user_id_str]["cezali"] = False
+    verileri_kaydet()
+
+    await ctx.send(f"🎉 Congrats! You are now a **{rol_ismi}**!")
+
+
+@bot.command(name="istifa", aliases=["quitjob"], description="Meslekten ayrılır.")
+async def istifa_komut(ctx):
+    if not await kanal_kontrol(ctx):
+        return
+
+    user_id_str = str(ctx.author.id)
+    if user_id_str not in MESLEKLER_VERI or not MESLEKLER_VERI[user_id_str].get("meslek"):
+        await ctx.send("❌ You don't have an active job!")
+        return
+
+    rol_mapping = {"police": "Police", "doctor": "Doctor", "pilot": "Pilot"}
+    for meslek in GECERLI_MESLEKLER:
+        rol_ismi = rol_mapping.get(meslek, meslek.capitalize())
+        rol = discord.utils.get(ctx.guild.roles, name=rol_ismi)
+        if rol and rol in ctx.author.roles:
+            try:
+                await ctx.author.remove_roles(rol)
+            except Exception as e:
+                print(f"Resign role removal error: {e}")
+
+    MESLEKLER_VERI[user_id_str]["meslek"] = None
+    MESLEKLER_VERI[user_id_str]["cezali"] = False
+    verileri_kaydet()
+
+    await ctx.send(f"💼 **{ctx.author.mention}** successfully resigned.")
+
+
+@bot.command(name="polis", aliases=["police"], description="Polis görevi.")
+async def polis_komut(ctx):
+    if not await kanal_kontrol(ctx):
+        return
+
+    user_id_str = str(ctx.author.id)
+    if user_id_str not in MESLEKLER_VERI or MESLEKLER_VERI[user_id_str].get("meslek") != "police":
+        await ctx.send("❌ You are not a police officer! Use `!joinjob police`")
+        return
+
+    simdiki_zaman = datetime.datetime.now().timestamp()
+    son_polis_islem = MESLEKLER_VERI[user_id_str].get("son_polis_islem", 0)
+    cooldown_suresi = 180
+
+    if simdiki_zaman - son_polis_islem < cooldown_suresi:
+        kalan = int(cooldown_suresi - (simdiki_zaman - son_polis_islem))
+        await ctx.send(f"⏳ Cooldown remaining: **{kalan // 60} minutes {kalan % 60} seconds**")
+        return
+
+    MESLEKLER_VERI[user_id_str]["son_polis_islem"] = simdiki_zaman
+    verileri_kaydet()
+    bakiye_al(ctx.author.id)
+
+    veri = kullanici_veri_al(ctx.author.id)
+    if veri["gorevler"]["polis"] < 5:
+        veri["gorevler"]["polis"] += 1
+        if veri["gorevler"]["polis"] == 5:
+            veri["xp"] += 100
+            await ctx.send(f"✅ {ctx.author.mention}, **Police Quest** completed! `+100 XP` earned.")
+        verileri_kaydet()
+
+    if random.choice([True, False]):
+        COINLER[ctx.author.id] += 550
+        verileri_kaydet()
+        embed = discord.Embed(
+            title="🚨 Criminal Caught!",
+            description=f"**{ctx.author.mention}** caught the criminal!\n🎉 **+550 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            color=discord.Color.green(),
+        )
+    else:
+        COINLER[ctx.author.id] = max(0, COINLER[ctx.author.id] - 250)
+        verileri_kaydet()
+        embed = discord.Embed(
+            title="🏃 Criminal Escaped!",
+            description=f"**{ctx.author.mention}** lost the suspect!\n💸 **-250 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            color=discord.Color.red(),
+        )
+    await ctx.send(embed=embed)
+
+
+@bot.command(name="doktor", aliases=["doctor"], description="Doktor görevi.")
+async def doktor_komut(ctx):
+    if not await kanal_kontrol(ctx):
+        return
+
+    user_id_str = str(ctx.author.id)
+    if user_id_str not in MESLEKLER_VERI or MESLEKLER_VERI[user_id_str].get("meslek") != "doctor":
+        await ctx.send("❌ You are not a doctor! Use `!joinjob doctor`")
+        return
+
+    simdiki_zaman = datetime.datetime.now().timestamp()
+    son_doktor_islem = MESLEKLER_VERI[user_id_str].get("son_doktor_islem", 0)
+    cooldown_suresi = 180
+
+    if simdiki_zaman - son_doktor_islem < cooldown_suresi:
+        kalan = int(cooldown_suresi - (simdiki_zaman - son_doktor_islem))
+        await ctx.send(f"⏳ Cooldown remaining: **{kalan // 60} minutes {kalan % 60} seconds**")
+        return
+
+    MESLEKLER_VERI[user_id_str]["son_doktor_islem"] = simdiki_zaman
+    verileri_kaydet()
+    bakiye_al(ctx.author.id)
+
+    if random.choice([True, False]):
+        COINLER[ctx.author.id] += 2500
+        verileri_kaydet()
+        embed = discord.Embed(
+            title="🏥 Successful Surgery!",
+            description=f"**{ctx.author.mention}** saved the patient!\n🎉 **+2,500 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            color=discord.Color.green(),
+        )
+    else:
+        COINLER[ctx.author.id] = max(0, COINLER[ctx.author.id] - 750)
+        verileri_kaydet()
+        embed = discord.Embed(
+            title="💔 Failed Surgery!",
+            description=f"**{ctx.author.mention}** lost the patient.\n💸 **-750 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            color=discord.Color.red(),
+        )
+    await ctx.send(embed=embed)
+
+
+@bot.command(name="pilot", description="Pilot görevi.")
+async def pilot_komut(ctx):
+    if not await kanal_kontrol(ctx):
+        return
+
+    user_id_str = str(ctx.author.id)
+    if user_id_str not in MESLEKLER_VERI or MESLEKLER_VERI[user_id_str].get("meslek") != "pilot":
+        await ctx.send("❌ You are not a pilot! Use `!joinjob pilot`")
+        return
+
+    simdiki_zaman = datetime.datetime.now().timestamp()
+    son_islem = MESLEKLER_VERI[user_id_str].get("son_islem", 0)
+
+    yasak_suresi = 600 if MESLEKLER_VERI[user_id_str].get("cezali", False) else 0
+    if yasak_suresi > 0 and simdiki_zaman - son_islem < yasak_suresi:
+        kalan = int(yasak_suresi - (simdiki_zaman - son_islem))
+        await ctx.send(f"⏳ Flight ban active! Remaining: **{kalan // 60} minutes {kalan % 60} seconds**")
+        return
+
+    son_pilot_islem = MESLEKLER_VERI[user_id_str].get("son_pilot_islem", 0)
+    cooldown_suresi = 180
+    if simdiki_zaman - son_pilot_islem < cooldown_suresi:
+        kalan = int(cooldown_suresi - (simdiki_zaman - son_pilot_islem))
+        await ctx.send(f"⏳ Maintenance cooldown: **{kalan // 60} minutes {kalan % 60} seconds**")
+        return
+
+    MESLEKLER_VERI[user_id_str]["son_pilot_islem"] = simdiki_zaman
+    MESLEKLER_VERI[user_id_str]["cezali"] = False
+    MESLEKLER_VERI[user_id_str]["son_islem"] = simdiki_zaman
+    bakiye_al(ctx.author.id)
+
+    if random.choice([True, False]):
+        COINLER[ctx.author.id] += 1750
+        verileri_kaydet()
+        embed = discord.Embed(
+            title="✈️ Safe Flight!",
+            description=f"**{ctx.author.mention}** completed the flight successfully!\n🎉 **+1,750 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            color=discord.Color.green(),
+        )
+    else:
+        MESLEKLER_VERI[user_id_str]["cezali"] = True
+        MESLEKLER_VERI[user_id_str]["son_islem"] = simdiki_zaman
+        verileri_kaydet()
+        embed = discord.Embed(
+            title="⚠️ Flight Cancelled!",
+            description=f"**{ctx.author.mention}** encountered bad weather conditions!\n🚫 Received a **10-minute flight ban**!",
+            color=discord.Color.red(),
+        )
+    await ctx.send(embed=embed)
+
+
+# ==========================================
+# 9. MODERASYON KOMUTLARI
+# ==========================================
+
+def sure_hesapla(sayi: int, birim: str):
+    birim = birim.lower()
+    if birim in ["saniye", "s"]:
+        return sayi
+    elif birim in ["dakika", "d"]:
+        return sayi * 60
+    elif birim in ["saat", "h"]:
+        return sayi * 3600
+    elif birim in ["gün", "g"]:
+        return sayi * 86400
+    return None
+
+
+@bot.command(name="mute", description="Kullanıcıyı mutelar.")
+@commands.has_permissions(moderate_members=True)
+async def mute(ctx, kullanici: discord.Member, sayi: int, birim: str):
+    toplam_saniye = sure_hesapla(sayi, birim)
+    if not toplam_saniye:
+        await ctx.send("❌ Invalid time unit! (`s`, `d`, `h`, `g`)")
+        return
+
+    sure = datetime.timedelta(seconds=toplam_saniye)
+    try:
+        await kullanici.timeout(sure, reason=f"{ctx.author} muted.")
+        await ctx.send(f"🔒 **{kullanici.mention}** successfully muted for **{sayi} {birim}**!")
+    except Exception as e:
+        await ctx.send(f"Error: {e}")
+
+
+@bot.command(name="unmute", description="Mute kaldırır.")
+@commands.has_permissions(moderate_members=True)
+async def unmute(ctx, kullanici: discord.Member):
+    try:
+        await kullanici.timeout(None, reason=f"{ctx.author} unmuted.")
+        await ctx.send(f"🔊 Mute removed for **{kullanici.mention}**!")
+    except Exception as e:
+        await ctx.send(f"Error: {e}")
+
+
+@bot.command(name="ban", description="Kullanıcıyı banlar.")
+@commands.has_permissions(ban_members=True)
+async def ban(ctx, kullanici: discord.Member, *, sebep: str = "Not specified"):
+    try:
+        await kullanici.ban(reason=sebep)
+        await ctx.send(f"🔨 **{kullanici.name}** banned! Reason: {sebep}")
+    except Exception as e:
+        await ctx.send(f"Error: {e}")
+
+
+@bot.command(name="kick", description="Kullanıcıyı atar.")
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, kullanici: discord.Member, *, sebep: str = "Not specified"):
+    try:
+        await kullanici.kick(reason=sebep)
+        await ctx.send(f"👢 **{kullanici.name}** kicked! Reason: {sebep}")
+    except Exception as e:
+        await ctx.send(f"Error: {e}")
+
+
+@bot.command(name="unban", description="ID ile ban kaldırır.")
+@commands.has_permissions(ban_members=True)
+async def unban(ctx, user_id: str):
+    if not user_id.isdigit():
+        await ctx.send("❌ Please enter a valid User ID!")
+        return
+
+    try:
+        user = await bot.fetch_user(int(user_id))
+        await ctx.guild.unban(user)
+        await ctx.send(f"🔓 Unbanned **{user.name}**!")
+    except Exception as e:
+        await ctx.send(f"Error: {e}")
+
+
+@bot.command(name="odayaçek", aliases=["çek"], description="Kullanıcıyı odanıza çeker.")
+async def odayacek(ctx, kullanici: discord.Member):
+    if not ctx.author.guild_permissions.move_members:
+        await ctx.send("❌ You don't have **Move Members** permission!")
+        return
+
+    if not ctx.author.voice or not ctx.author.voice.channel:
+        await ctx.send("❌ You are not in a voice channel!")
+        return
+
+    if not kullanici.voice or not kullanici.voice.channel:
+        await ctx.send(f"❌ **{kullanici.name}** is not in a voice channel!")
+        return
+
+    hedef_kanal = ctx.author.voice.channel
+    try:
+        await kullanici.move_to(hedef_kanal, reason=f"{ctx.author} pulled user.")
+        await ctx.send(f"🎯 **{kullanici.mention}** moved to **{hedef_kanal.name}**!")
+    except Exception as e:
+        await ctx.send(f"Error: {e}")
+
+
+@bot.command(name="sil", description="Mesaj siler.")
+@commands.has_permissions(manage_messages=True)
+async def sil(ctx, sayi: int):
+    if sayi <= 0:
+        await ctx.send("❌ Enter a number greater than 0!")
+        return
+
+    silinen = await ctx.channel.purge(limit=sayi + 1)
+    mesaj = await ctx.send(f"🧹 Successfully deleted **{len(silinen) - 1}** messages!")
+    await asyncio.sleep(3)
+    await mesaj.delete()
+
+
+@bot.command(name="kapat", description="Kanalı kilitler.")
+@commands.has_permissions(manage_channels=True)
+async def kapat(ctx):
+    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
+    await ctx.send(f"🔒 **{ctx.channel.name}** locked!")
+
+
+@bot.command(name="aç", description="Kanal kilidini açar.")
+@commands.has_permissions(manage_channels=True)
+async def ac(ctx):
+    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
+    await ctx.send(f"🔓 **{ctx.channel.name}** unlocked for messages!")
+
+
+@bot.command(name="slowmode", description="Yavaş mod ayarlar.")
+@commands.has_permissions(manage_channels=True)
+async def slowmode(ctx, saniye: int = 0):
+    try:
+        await ctx.channel.edit(slowmode_delay=saniye)
+        if saniye == 0:
+            await ctx.send("⏱️ Slowmode removed.")
+        else:
+            await ctx.send(f"⏱️ Slowmode set to **{saniye}** seconds!")
+    except Exception as e:
+        await ctx.send(f"Error: {e}")
+
+
+@bot.command(name="rolver", description="Kullanıcıya rol verir.")
+@commands.has_permissions(manage_roles=True)
+async def rolver(ctx, kullanici: discord.Member, *, rol: discord.Role):
+    try:
+        await kullanici.add_roles(rol, reason=f"{ctx.author} tarafından verildi.")
+        await ctx.send(f"✅ **{kullanici.name}** adlı üyeye **{rol.name}** rolü eklendi!")
+    except Exception as e:
+        await ctx.send(f"❌ Rol verilirken bir hata oluştu: {e}")
+
+
+@bot.command(name="rolal", description="Kullanıcıdan rol alır.")
+@commands.has_permissions(manage_roles=True)
+async def rolal(ctx, kullanici: discord.Member, *, rol: discord.Role):
+    try:
+        await kullanici.remove_roles(rol, reason=f"{ctx.author} tarafından alındı.")
+        await ctx.send(f"✅ **{kullanici.name}** adlı üyenin **{rol.name}** rolü alındı!")
+    except Exception as e:
+        await ctx.send(f"❌ Rol alınırken bir hata oluştu: {e}")
+
+
+@bot.command(name="uyarıver", aliases=["warn"], description="Kullanıcıyı uyarır.")
+@commands.has_permissions(manage_messages=True)
+async def uyariver(ctx, kullanici: discord.Member, *, sebep: str = "Belirtilmedi"):
+    embed = discord.Embed(
+        title="⚠️ Uyarı Verildi",
+        color=discord.Color.yellow(),
+        timestamp=datetime.datetime.now()
+    )
+    embed.add_field(name="Uyaralan Üye", value=f"{kullanici.mention} (`{kullanici.id}`)", inline=False)
+    embed.add_field(name="Yetkili", value=f"{ctx.author.mention}", inline=False)
+    embed.add_field(name="Sebep", value=sebep, inline=False)
+    
+    await ctx.send(embed=embed)
+    try:
+        await kullanici.send(f"⚠️ **{ctx.guild.name}** sunucusunda uyarıldın!\nSebep: `{sebep}`")
+    except:
+        pass
+
+
+@bot.command(name="lockall", description="Tüm sunucuyu kilitler.")
+@commands.has_permissions(administrator=True)
+async def lockall(ctx):
+    for kanal in ctx.guild.text_channels:
+        try:
+            await kanal.set_permissions(ctx.guild.default_role, send_messages=False)
+        except:
+            pass
+    await ctx.send("🔒 Sunucudaki tüm metin kanalları kilitlendi!")
+
+
+@bot.command(name="unlockall", description="Tüm sunucu kilidini açar.")
+@commands.has_permissions(administrator=True)
+async def unlockall(ctx):
+    for kanal in ctx.guild.text_channels:
+        try:
+            await kanal.set_permissions(ctx.guild.default_role, send_messages=True)
+        except:
+            pass
+    await ctx.send("🔓 Sunucudaki tüm metin kanallarının kilidi açıldı!")
+
+
+# ==========================================
+# 10. WEB KEEP-ALIVE SUNUCUSU & BOT BAŞLATMA
+# ==========================================
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot aktif ve 7/24 çalışıyor!"
+
+def run_web():
+    app.run(host='0.0.0.0', port=8080)
+
+def web_sunucusunu_baslat():
+    t = Thread(target=run_web)
+    t.start()
+
+
+if __name__ == '__main__':
+    web_sunucusunu_baslat()
+    if TOKEN:
+        bot.run(TOKEN)
+    else:
+        print("❌ HATA: .env dosyasında TOKEN bulunamadı!")
