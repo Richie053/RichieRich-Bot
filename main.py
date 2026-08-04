@@ -4,6 +4,7 @@ import json
 import os
 import itertools
 import random
+import atexit
 import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -112,6 +113,9 @@ def verileri_kaydet():
         json.dump(veriler, f, ensure_ascii=False, indent=4)
 
 
+# Bot kapanırken verilerin kaybolmaması için otomatik kayıt tetikleyicisi
+atexit.register(verileri_kaydet)
+
 COINLER, GUNLUK_SURELER, MESLEKLER_VERI, SEVIYE_VERI = verileri_yukle()
 
 
@@ -132,6 +136,7 @@ def kullanici_veri_al(user_id):
             "gorevler": {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0}
         }
     else:
+        # Tarih değiştiğinde SADECE günlük limit ve görevler sıfırlanır (XP ve Level kesinlikle silinmez)
         if SEVIYE_VERI[user_id_str].get("son_sifirlama") != bugun:
             SEVIYE_VERI[user_id_str]["son_sifirlama"] = bugun
             SEVIYE_VERI[user_id_str]["gunluk_level"] = 0
@@ -399,11 +404,11 @@ async def seviye_paneli(ctx):
     bar = "🟩" * dolu_blok + "⬛" * bos_blok
     
     rutbe = "Rookie"
-    if lvl >= 50: rutbe = "💎 Diamond"
-    elif lvl >= 40: rutbe = "💚 Emerald"
-    elif lvl >= 30: rutbe = "💛 Gold"
-    elif lvl >= 20: rutbe = "🤍 Silver"
-    elif lvl >= 10: rutbe = "🧡 Copper"
+    if lvl >= 50: rutbe = "Diamond"
+    elif lvl >= 40: rutbe = "Emerald"
+    elif lvl >= 30: rutbe = "Gold"
+    elif lvl >= 20: rutbe = "Silver"
+    elif lvl >= 10: rutbe = "Copper"
 
     embed = discord.Embed(
         title="📊 LEVEL & PROGRESS SYSTEM / SEVİYE SİSTEMİ",
@@ -414,20 +419,6 @@ async def seviye_paneli(ctx):
     embed.add_field(
         name="📈 Progress / İlerleme",
         value=f"Level: **{lvl}** | XP: `{xp}/100`\n[{bar}] {xp}%",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="🎁 Rewards & Minecraft Roles / Ödüller & Roller",
-        value=(
-            "• **Her Level:** `500 Coin`\n"
-            "• **Level 5, 15, 25, 35, 45:** `Mystery Box` 🎁\n"
-            "• **Level 10:** `Copper` Rolü \n"
-            "• **Level 20:** `Silver` Rolü \n"
-            "• **Level 30:** `Gold` Rolü \n"
-            "• **Level 40:** `Emerald` Rolü \n"
-            "• **Level 50:** `Diamond` Rolü "
-        ),
         inline=False
     )
     
