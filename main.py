@@ -647,10 +647,6 @@ async def satinal(ctx, urun_id: str):
                 reason=f"{ctx.author} için kişiye özel renk rolü."
             )
             
-            bot_rolu = ctx.guild.me.top_role
-            hedef_pozisyon = max(1, bot_rolu.position - 1)
-            
-            await yeni_rol.edit(position=hedef_pozisyon)
             await ctx.author.add_roles(yeni_rol)
             
             await ctx.send(f"🎉 Tebrikler! **{esya['fiyat']} Coin** ödeyerek Kişiye Özel Renk hakkı satın aldın!\n✨ **{rol_adi}** rolün oluşturuldu.\nArtık `!colour #HEXKODU` veya `!renk #HEXKODU` yazarak rengini değiştirebilirsin!")
