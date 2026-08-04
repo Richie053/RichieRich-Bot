@@ -63,7 +63,7 @@ def verileri_yukle():
                     if v.get("meslek_bilgi"):
                         meslekler_veri[user_id_str] = v["meslek_bilgi"]
                         
-                    # Seviye ve Görev Verileri
+                    # Seviye ve Görev Verileri (Eksiksiz Yükleme)
                     seviye_veri[user_id_str] = {
                         "xp": v.get("xp", 0),
                         "level": v.get("level", 1),
@@ -90,15 +90,24 @@ def verileri_kaydet():
     
     for user_id in tum_idler:
         user_id_str = str(user_id)
+        
+        # Eğer kullanıcı seviye verilerinde yoksa varsayılan oluştur
+        if user_id_str not in SEVIYE_VERI:
+            SEVIYE_VERI[user_id_str] = {
+                "xp": 0, "level": 1, "gunluk_level": 0, 
+                "son_sifirlama": str(datetime.date.today()),
+                "gorevler": {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0}
+            }
+
         veriler[user_id_str] = {
             "bakiye": COINLER.get(user_id, 0),
             "son_gunluk": GUNLUK_SURELER[user_id].isoformat() if user_id in GUNLUK_SURELER else None,
             "meslek_bilgi": MESLEKLER_VERI.get(user_id_str, {}),
-            "xp": SEVIYE_VERI.get(user_id_str, {}).get("xp", 0),
-            "level": SEVIYE_VERI.get(user_id_str, {}).get("level", 1),
-            "gunluk_level": SEVIYE_VERI.get(user_id_str, {}).get("gunluk_level", 0),
-            "son_sifirlama": SEVIYE_VERI.get(user_id_str, {}).get("son_sifirlama", str(datetime.date.today())),
-            "gorevler": SEVIYE_VERI.get(user_id_str, {}).get("gorevler", {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0})
+            "xp": SEVIYE_VERI[user_id_str].get("xp", 0),
+            "level": SEVIYE_VERI[user_id_str].get("level", 1),
+            "gunluk_level": SEVIYE_VERI[user_id_str].get("gunluk_level", 0),
+            "son_sifirlama": SEVIYE_VERI[user_id_str].get("son_sifirlama", str(datetime.date.today())),
+            "gorevler": SEVIYE_VERI[user_id_str].get("gorevler", {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0})
         }
 
     with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
@@ -119,16 +128,20 @@ def bakiye_al(user_id):
 def kullanici_veri_al(user_id):
     user_id_str = str(user_id)
     bugun = str(datetime.date.today())
+    
     if user_id_str not in SEVIYE_VERI:
         SEVIYE_VERI[user_id_str] = {
             "xp": 0, "level": 1, "gunluk_level": 0, "son_sifirlama": bugun,
             "gorevler": {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0}
         }
     else:
+        # Tarih değiştiyse günlük limitleri ve görevleri sıfırla
         if SEVIYE_VERI[user_id_str].get("son_sifirlama") != bugun:
             SEVIYE_VERI[user_id_str]["son_sifirlama"] = bugun
             SEVIYE_VERI[user_id_str]["gunluk_level"] = 0
             SEVIYE_VERI[user_id_str]["gorevler"] = {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0}
+            verileri_kaydet()
+            
     return SEVIYE_VERI[user_id_str]
 
 
@@ -153,7 +166,7 @@ async def on_ready():
 async def xp_ekle(message, miktar):
     veri = kullanici_veri_al(message.author.id)
     
-    # Günlük level sınırı kontrolü (Günlük 5 level limitine ulaşıldıysa XP artışını tamamen durdur)
+    # Günlük level sınırı kontrolü (Günlük 5 level limitine ulaşıldıysa XP eklenmesini engelle)
     if veri["gunluk_level"] >= 5:
         return
 
@@ -199,6 +212,8 @@ async def xp_ekle(message, miktar):
             color=discord.Color.gold()
         )
         await message.channel.send(embed=embed)
+
+    verileri_kaydet()
 
 
 @bot.event
