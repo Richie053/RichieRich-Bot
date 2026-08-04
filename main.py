@@ -347,7 +347,7 @@ async def odapanel(ctx):
     await ctx.message.delete()
 
 
-# --- EKONOMİ, MARKET VE KUMAR SİSTEMLERİ ---
+# --- Bakiye ---
 def bakiye_al(user_id):
     if user_id not in COINLER:
         COINLER[user_id] = 500
@@ -357,21 +357,23 @@ def bakiye_al(user_id):
 
 @bot.command(
     name="cüzdan",
-    aliases=["bakiye"],
-    description="Cüzdanındaki coin miktarını gösterir.",
+    aliases=["bakiye", "wallet", "balance"],
+    description="Cüzdanındaki coin miktarını gösterir. / Shows your wallet balance.",
 )
 async def cuzdan(ctx):
     bakiye = bakiye_al(ctx.author.id)
     embed = discord.Embed(
-        title=f"💰 {ctx.author.name} Kişisinin Cüzdanı",
-        description=f"Toplam Bakiyen: **{bakiye} Coin** 🪙",
+        title=f"💰 {ctx.author.name}'s Wallet / Cüzdanı",
+        description=f"Toplam Bakiye / Total Balance: **{bakiye} Coin** 🪙",
         color=discord.Color.gold(),
     )
     await ctx.send(embed=embed)
 
 
 @bot.command(
-    name="günlük", description="Her gün 200 ücretsiz coin hediyeni alırsın."
+    name="günlük", 
+    aliases=["daily"], 
+    description="Her gün 200 ücretsiz coin hediyeni alırsın. / Claim your daily 200 coins reward."
 )
 async def gunluk(ctx):
     user_id = ctx.author.id
@@ -384,8 +386,8 @@ async def gunluk(ctx):
             kalan_saat = kalan_saniye // 3600
             kalan_dakika = (kalan_saniye % 3600) // 60
             await ctx.send(
-                f"⏳ Hey uyanık! Günlük ödülünü zaten almışsın. Tekrar alabilmek"
-                f" için **{kalan_saat} saat {kalan_dakika} dakika** beklemelisin! ⏰"
+                f"⏳ Günlük ödülünü zaten almışsın! / You already claimed your daily reward!\n"
+                f"Kalan süre / Remaining time: **{kalan_saat} saat {kalan_dakika} dakika / hours & minutes** ⏰"
             )
             return
 
@@ -395,10 +397,9 @@ async def gunluk(ctx):
     verileri_kaydet()
 
     await ctx.send(
-        f"🎁 Günlük ödülün olan **200 Coin** cüzdanına eklendi! Yeni"
-        f" bakiyen: **{COINLER[user_id]} Coin** 🪙"
+        f"🎁 Günlük ödülün olan **200 Coin** cüzdanına eklendi! / Daily reward added!\n"
+        f"Yeni bakiye / New balance: **{COINLER[user_id]} Coin** 🪙"
     )
-
 
 # --- TOP VE CÜZDAN SIRALAMA KOMUTU ---
 @bot.command(
@@ -437,15 +438,16 @@ async def top(ctx):
     await ctx.send(embed=embed)
 
 
-# --- PARA EKLEME KOMUTU (YETKİLİ) ---
+# --- PARA EKLEME KOMUTU (YETKİLİ) (!paraekle / !addcoins) ---
 @bot.command(
     name="paraekle",
-    description="Belirtilen kullanıcıya cüzdan bakiyesi ekler.",
+    aliases=["addcoins", "givemoney"],
+    description="Belirtilen kullanıcıya cüzdan bakiyesi ekler. / Adds coins to a user's wallet.",
 )
 @commands.has_permissions(administrator=True)
 async def paraekle(ctx, kullanici: discord.Member, miktar: int):
     if miktar <= 0:
-        await ctx.send("❌ 0'dan büyük bir miktar girmelisin!")
+        await ctx.send("❌ 0'dan büyük bir miktar girmelisin! / You must enter an amount greater than 0!")
         return
 
     user_id = kullanici.id
@@ -454,35 +456,60 @@ async def paraekle(ctx, kullanici: discord.Member, miktar: int):
     verileri_kaydet()
 
     await ctx.send(
-        f"✅ **{kullanici.name}** adlı kullanıcının cüzdanına **{miktar} Coin**"
-        f" eklendi! Yeni bakiyesi: **{COINLER[user_id]} Coin** 🪙"
+        f"✅ **{kullanici.name}** adlı kullanıcının cüzdanına **{miktar} Coin** eklendi! / Added coins!\n"
+        f"Yeni bakiyesi / New balance: **{COINLER[user_id]} Coin** 🪙"
     )
 
 
-# --- COİN GÖNDERME SİSTEMİ (!gönder) ---
+# --- PARA SİLME KOMUTU (YETKİLİ) (!parasil / !removecoins) ---
+@bot.command(
+    name="parasil",
+    aliases=["removecoins", "takemoney"],
+    description="Belirtilen kullanıcının cüzdanından coin siler. / Removes coins from a user's wallet.",
+)
+@commands.has_permissions(administrator=True)
+async def parasil(ctx, kullanici: discord.Member, miktar: int):
+    if miktar <= 0:
+        await ctx.send("❌ 0'dan büyük bir miktar girmelisin! / You must enter an amount greater than 0!")
+        return
+
+    user_id = kullanici.id
+    mevcut_bakiye = bakiye_al(user_id)
+    
+    # Bakiyenin eksiye düşmesini engelliyoruz (en az 0 olur)
+    COINLER[user_id] = max(0, mevcut_bakiye - miktar)
+    verileri_kaydet()
+
+    await ctx.send(
+        f"✅ **{kullanici.name}** adlı kullanıcının cüzdanından **{miktar} Coin** silindi! / Removed coins!\n"
+        f"Yeni bakiyesi / New balance: **{COINLER[user_id]} Coin** 🪙"
+    )
+
+# --- COİN GÖNDERME SİSTEMİ (!gönder / !send) ---
 @bot.command(
     name="gönder",
-    description="Belirtilen kullanıcıya cüzdanından coin transfer edersin.",
+    aliases=["send", "transfer"],
+    description="Belirtilen kullanıcıya cüzdanından coin transfer edersin. / Transfers coins to a user.",
 )
 async def gonder(ctx, hedef: discord.Member, miktar: int):
     kanal_adi = ctx.channel.name.lower()
-    if not any(k in kanal_adi for k in ["komutlar", "rulet", "blackjack"]):
+    if not any(k in kanal_adi for k in ["komutlar", "rulet", "blackjack", "commands"]):
         await ctx.send(
-            "❌ Bu komutu sadece **📈komutlar**, **🎰rulet** veya"
-            " **🃏blackjack** kanallarında kullanabilirsin!"
+            "❌ Bu komutu sadece **📈komutlar / commands**, **🎰rulet** veya **🃏blackjack** kanallarında kullanabilirsin!\n"
+            "You can only use this command in command channels!"
         )
         return
 
     if miktar <= 0:
-        await ctx.send("❌ 0'dan büyük bir miktar girmelisin!")
+        await ctx.send("❌ 0'dan büyük bir miktar girmelisin! / You must enter an amount greater than 0!")
         return
 
     if hedef.id == ctx.author.id:
-        await ctx.send("❌ Kendine coin gönderemezsin!")
+        await ctx.send("❌ Kendine coin gönderemezsin! / You cannot send coins to yourself!")
         return
 
     if hedef.bot:
-        await ctx.send("❌ Botlara coin gönderemezsin!")
+        await ctx.send("❌ Botlara coin gönderemezsin! / You cannot send coins to bots!")
         return
 
     gonderen_id = ctx.author.id
@@ -492,8 +519,8 @@ async def gonder(ctx, hedef: discord.Member, miktar: int):
 
     if gonderen_bakiye < miktar:
         await ctx.send(
-            f"❌ Yeterli coinin yok! Güncel bakiyen: **{gonderen_bakiye} Coin**"
-            " 🪙"
+            f"❌ Yeterli coinin yok! / Not enough coins!\n"
+            f"Güncel bakiyen / Current balance: **{gonderen_bakiye} Coin** 🪙"
         )
         return
 
@@ -503,15 +530,15 @@ async def gonder(ctx, hedef: discord.Member, miktar: int):
     verileri_kaydet()
 
     embed = discord.Embed(
-        title="💸 Coin Transferi Başarılı",
+        title="💸 Coin Transferi Başarılı / Transfer Successful",
         description=(
-            f"**{ctx.author.mention}**, **{hedef.mention}** adlı kullanıcıya"
-            f" başarıyla **{miktar} Coin** gönderdi! 🪙"
+            f"**{ctx.author.mention}** -> **{hedef.mention}**\n"
+            f"Başarıyla **{miktar} Coin** gönderildi! / Successfully sent **{miktar} Coins**! 🪙"
         ),
         color=discord.Color.green(),
     )
     embed.add_field(
-        name="Yeni Bakiyen",
+        name="Yeni Bakiyen / New Balance",
         value=f"**{COINLER[gonderen_id]} Coin**",
         inline=True,
     )
