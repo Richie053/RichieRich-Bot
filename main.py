@@ -950,6 +950,7 @@ async def meslekler_komut(ctx):
             "* Meslek seçmek için: `!meslekseç <police/pilot/doctor>`\n"
             "* Bekleme süresi: **3 dakika**\n"
             "* İstifa: `!istifa`"
+            
             "**EN:** Updated job system:\n"
             "* Choose job: `!joinjob <police/pilot/doctor>`\n"
             "* Cooldown: **3 minutes**\n"
