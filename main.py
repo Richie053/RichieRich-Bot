@@ -756,7 +756,6 @@ async def renk_degistir(ctx, hex_kodu: str):
 
 @bot.command(name="rulet", description="Rulet oynarsın.")
 async def rulet(ctx, renk: str, miktar: int):
-    # Kanal adında "rulet" geçiyorsa çalışmasına izin verilir
     if "rulet" not in ctx.channel.name.lower():
         await ctx.send("❌ You can only use this command in the **🎰rulet** channel!")
         return
@@ -777,11 +776,12 @@ async def rulet(ctx, renk: str, miktar: int):
         await ctx.send(f"❌ Not enough coins! Your balance: **{bakiye:,} Coin** 🪙")
         return
 
-    # Görev kontrolü ve XP güncellemesi
+    # Görev kontrolü ve kayıt güvencesi
     veri = kullanici_veri_al(user_id)
     if miktar >= 1000 and veri["gorevler"].get("rulet", 0) < 1:
         veri["gorevler"]["rulet"] = 1
         veri["xp"] += 100
+        verileri_kaydet()
         await ctx.send(f"✅ {ctx.author.mention}, **Roulette Quest** completed! `+100 XP` earned.")
 
     animasyon_embed = discord.Embed(
@@ -795,9 +795,9 @@ async def rulet(ctx, renk: str, miktar: int):
         animasyon_embed.description = f"Wheel is spinning fast: **{adim}** 🎲"
         try:
             await mesaj.edit(embed=animasyon_embed)
-        except:
+        except Exception:
             pass
-        await asyncio.sleep(0.6)
+        await asyncio.sleep(0.5)
 
     sonuclar = ["kırmızı"] * 47 + ["siyah"] * 47 + ["yeşil"] * 6
     gelen_renk = random.choice(sonuclar)
@@ -825,7 +825,7 @@ async def rulet(ctx, renk: str, miktar: int):
     verileri_kaydet()
     try:
         await mesaj.edit(embed=embed)
-    except:
+    except Exception:
         await ctx.send(embed=embed)
 
 
