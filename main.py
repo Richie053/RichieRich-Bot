@@ -777,7 +777,7 @@ async def rulet(ctx, renk: str, miktar: int):
         await ctx.send(f"❌ Not enough coins! Your balance: **{bakiye:,} Coin** 🪙")
         return
 
-    # Görev kontrolü ve XP güncellemesi güvenli hale getirildi
+    # Görev kontrolü ve XP güncellemesi
     veri = kullanici_veri_al(user_id)
     if miktar >= 1000 and veri["gorevler"].get("rulet", 0) < 1:
         veri["gorevler"]["rulet"] = 1
