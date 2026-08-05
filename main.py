@@ -947,9 +947,9 @@ async def meslekler_komut(ctx):
         title="🥼 Sunucu Meslekler Paneli 2.0 / Server Jobs Panel 2.0",
         description=(
             "**TR:** Güncellenen meslek oranları:\n"
-            "* Meslek seçmek için: `!meslekseç <police/pilot/doctor>` veya `!joinjob`\n"
+            "* Meslek seçmek için: `!meslekseç <police/pilot/doctor>`\n"
             "* Bekleme süresi: **3 dakika**\n"
-            "* İstifa: `!istifa` veya `!quitjob`\n\n"
+            "* İstifa: `!istifa`\n\n"
             "**EN:** Updated job system:\n"
             "* Choose job: `!joinjob <police/pilot/doctor>`\n"
             "* Cooldown: **3 minutes**\n"
