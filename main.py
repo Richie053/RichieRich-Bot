@@ -4,7 +4,6 @@ import json
 import os
 import itertools
 import random
-import atexit
 import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -29,7 +28,6 @@ VERI_DOSYASI = "ekonomi.json"
 YASAKLI_KELIMELER = ["annesiz", "orospuçocuğu", "oç", "oe"]
 TETIKLEYICI_KANAL = "➕ | Oda Oluştur"
 DEVAM_EDEN_AVIATORLER = set()
-GECERLI_MESLEKLER = ["police", "pilot", "doctor"]
 
 # Rich Presence Durum Döngüsü
 richie_rich_durumlari = itertools.cycle([
@@ -52,34 +50,22 @@ def verileri_yukle():
                 coinler = {int(k): v["bakiye"] for k, v in veriler.items() if "bakiye" in v}
                 sureler = {}
                 meslekler_veri = {}
-                seviye_veri = {}
                 
                 for k, v in veriler.items():
                     user_id_str = str(k)
                     user_id_int = int(k)
                     
                     if v.get("son_gunluk"):
-                        try:
-                            sureler[user_id_int] = datetime.datetime.fromisoformat(v["son_gunluk"])
-                        except:
-                            pass
+                        sureler[user_id_int] = datetime.datetime.fromisoformat(v["son_gunluk"])
                     
                     if v.get("meslek_bilgi"):
                         meslekler_veri[user_id_str] = v["meslek_bilgi"]
                         
-                    seviye_veri[user_id_str] = {
-                        "xp": v.get("xp", 0),
-                        "level": v.get("level", 1),
-                        "gunluk_level": v.get("gunluk_level", 0),
-                        "son_sifirlama": v.get("son_sifirlama", str(datetime.date.today())),
-                        "gorevler": v.get("gorevler", {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0})
-                    }
-                        
-                return coinler, sureler, meslekler_veri, seviye_veri
+                return coinler, sureler, meslekler_veri
         except Exception as e:
             print(f"⚠️ Veri yüklenirken hata oluştu: {e}")
             
-    return {}, {}, {}, {}
+    return {}, {}, {}
 
 
 def verileri_kaydet():
@@ -87,41 +73,26 @@ def verileri_kaydet():
     tum_idler = set(
         list(COINLER.keys()) + 
         [int(k) for k in GUNLUK_SURELER.keys()] + 
-        [int(k) for k in MESLEKLER_VERI.keys() if str(k).isdigit()] +
-        [int(k) for k in SEVIYE_VERI.keys() if str(k).isdigit()]
+        [int(k) for k in MESLEKLER_VERI.keys() if str(k).isdigit()]
     )
     
     for user_id in tum_idler:
         user_id_str = str(user_id)
-        
-        if user_id_str not in SEVIYE_VERI:
-            SEVIYE_VERI[user_id_str] = {
-                "xp": 0, "level": 1, "gunluk_level": 0, 
-                "son_sifirlama": str(datetime.date.today()),
-                "gorevler": {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0}
-            }
-
         veriler[user_id_str] = {
-            "bakiye": COINLER.get(user_id, 500),
-            "son_gunluk": GUNLUK_SURELER[user_id].isoformat() if user_id in GUNLUK_SURELER else None,
-            "meslek_bilgi": MESLEKLER_VERI.get(user_id_str, {}),
-            "xp": SEVIYE_VERI[user_id_str].get("xp", 0),
-            "level": SEVIYE_VERI[user_id_str].get("level", 1),
-            "gunluk_level": SEVIYE_VERI[user_id_str].get("gunluk_level", 0),
-            "son_sifirlama": SEVIYE_VERI[user_id_str].get("son_sifirlama", str(datetime.date.today())),
-            "gorevler": SEVIYE_VERI[user_id_str].get("gorevler", {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0})
+            "bakiye": COINLER.get(user_id, 0),
+            "son_gunluk": None,
+            "meslek_bilgi": MESLEKLER_VERI.get(user_id_str, {})
         }
+        
+        if user_id in GUNLUK_SURELER:
+            veriler[user_id_str]["son_gunluk"] = GUNLUK_SURELER[user_id].isoformat()
 
-    try:
-        with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
-            json.dump(veriler, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"⚠️ Veri kaydedilirken hata: {e}")
+    with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
+        json.dump(veriler, f, ensure_ascii=False, indent=4)
 
 
-atexit.register(verileri_kaydet)
-
-COINLER, GUNLUK_SURELER, MESLEKLER_VERI, SEVIYE_VERI = verileri_yukle()
+# Belleğe verileri alma
+COINLER, GUNLUK_SURELER, MESLEKLER_VERI = verileri_yukle()
 
 
 def bakiye_al(user_id):
@@ -129,25 +100,6 @@ def bakiye_al(user_id):
         COINLER[user_id] = 500
         verileri_kaydet()
     return COINLER[user_id]
-
-
-def kullanici_veri_al(user_id):
-    user_id_str = str(user_id)
-    bugun = str(datetime.date.today())
-    
-    if user_id_str not in SEVIYE_VERI:
-        SEVIYE_VERI[user_id_str] = {
-            "xp": 0, "level": 1, "gunluk_level": 0, "son_sifirlama": bugun,
-            "gorevler": {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0}
-        }
-    else:
-        if SEVIYE_VERI[user_id_str].get("son_sifirlama") != bugun:
-            SEVIYE_VERI[user_id_str]["son_sifirlama"] = bugun
-            SEVIYE_VERI[user_id_str]["gunluk_level"] = 0
-            SEVIYE_VERI[user_id_str]["gorevler"] = {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0}
-            verileri_kaydet()
-            
-    return SEVIYE_VERI[user_id_str]
 
 
 # ==========================================
@@ -168,60 +120,6 @@ async def on_ready():
         durumu_guncelle.start()
 
 
-async def xp_ekle(message, miktar):
-    veri = kullanici_veri_al(message.author.id)
-    
-    if veri["gunluk_level"] >= 5:
-        return
-
-    veri["xp"] += miktar
-    
-    while veri["xp"] >= 100:
-        if veri["gunluk_level"] >= 5:
-            veri["xp"] = 100
-            break
-            
-        veri["xp"] -= 100
-        veri["level"] += 1
-        veri["gunluk_level"] += 1
-        yeni_level = veri["level"]
-        
-        odul_mesaji = ""
-        if yeni_level in [5, 15, 25, 35, 45]:
-            bakiye_al(message.author.id)
-            COINLER[message.author.id] += 1000
-            odul_mesaji = "🎁 **Level Reward / Seviye Ödülü:** Mystery Box opened (`1,000 Coin`)!"
-        else:
-            bakiye_al(message.author.id)
-            COINLER[message.author.id] += 500
-            odul_mesaji = "💰 **Level Reward / Seviye Ödülü:** `+500 Coin` added!"
-
-        rutbe_rolleri = {10: "Copper", 20: "Silver", 30: "Gold", 40: "Emerald", 50: "Diamond"}
-        if yeni_level in rutbe_rolleri:
-            rol_adi = rutbe_rolleri[yeni_level]
-            rol = discord.utils.get(message.guild.roles, name=rol_adi)
-            if rol and rol not in message.author.roles:
-                try:
-                    await message.author.add_roles(rol)
-                    odul_mesaji += f"\n🏆 **Rank Up:** `{rol_adi}` role assigned!"
-                except Exception as e:
-                    print(f"Rol verme hatası: {e}")
-
-        verileri_kaydet()
-        
-        embed = discord.Embed(
-            title="🚀 LEVEL UP! / SEVIYE ATLADINIZ!",
-            description=f"Congratulations {message.author.mention}, you reached **Level {yeni_level}**!\n\nTebrikler, **{yeni_level}. Seviye** oldunuz!\n\n{odul_mesaji}",
-            color=discord.Color.gold()
-        )
-        try:
-            await message.channel.send(embed=embed)
-        except:
-            pass
-
-    verileri_kaydet()
-
-
 @bot.event
 async def on_message(message):
     if message.author.bot:
@@ -229,6 +127,7 @@ async def on_message(message):
 
     mesaj_icerik = message.content.lower()
 
+    # 1. Küfür Filtresi
     for kelime in YASAKLI_KELIMELER:
         if kelime in mesaj_icerik:
             try:
@@ -255,33 +154,19 @@ async def on_message(message):
                 print(f"Küfür filtresi hatası: {e}")
             return
 
+    # 2. Kurallar Yönlendirmesi
     kural_anahtar_kelimeleri = ["kural", "kurallar", "sunucu kuralları", "yasak", "cezalar"]
     if any(k in mesaj_icerik for k in kural_anahtar_kelimeleri):
         kurallar_kanali = discord.utils.get(message.guild.text_channels, name="📝kurallar")
         if kurallar_kanali:
-            try:
-                await message.reply(f"📜 Sunucu kuralları için {kurallar_kanali.mention} kanalını ziyaret edebilirsiniz!")
-            except:
-                pass
-
-    if message.channel.name == "💬genel-sohbet":
-        await xp_ekle(message, 20)
-        veri = kullanici_veri_al(message.author.id)
-        if veri["gorevler"]["mesaj"] < 10:
-            veri["gorevler"]["mesaj"] += 1
-            if veri["gorevler"]["mesaj"] == 10:
-                veri["xp"] += 100
-                try:
-                    await message.channel.send(f"✅ {message.author.mention}, **Genel Sohbet Görevi / General Chat Quest** tamamlandı! `+100 XP` kazandın.")
-                except:
-                    pass
-            verileri_kaydet()
+            await message.reply(f"📜 Sunucu kuralları için {kurallar_kanali.mention} kanalını ziyaret edebilirsiniz!")
 
     await bot.process_commands(message)
 
 
 @bot.event
 async def on_voice_state_update(member, before, after):
+    # Özel Oda Oluşturma
     if after.channel and after.channel.name == TETIKLEYICI_KANAL:
         guild = member.guild
         kategori = after.channel.category
@@ -300,6 +185,7 @@ async def on_voice_state_update(member, before, after):
         except Exception as e:
             print(f"Özel oda oluşturulurken hata: {e}")
 
+    # Boş Özel Odaları Silme
     if before.channel and before.channel != after.channel:
         if before.channel.name.startswith("🔊 |") and len(before.channel.members) == 0:
             try:
@@ -312,6 +198,7 @@ async def on_voice_state_update(member, before, after):
 async def on_member_join(member):
     rol_adi = "Member"
     rol = discord.utils.get(member.guild.roles, name=rol_adi)
+
     if rol:
         try:
             await member.add_roles(rol, reason="Sunucuya katıldığı için otomatik rol verildi.")
@@ -320,24 +207,18 @@ async def on_member_join(member):
 
     kanal = discord.utils.get(member.guild.text_channels, name="bot-moderasyon")
     if kanal:
-        try:
-            await kanal.send(f"📥 **{member.mention}** ({member.name}) sunucuya katıldı! '{rol_adi}' rolü verildi.")
-        except:
-            pass
+        await kanal.send(f"📥 **{member.mention}** ({member.name}) sunucuya katıldı! '{rol_adi}' rolü verildi.")
 
 
 @bot.event
 async def on_member_remove(member):
     kanal = discord.utils.get(member.guild.text_channels, name="bot-moderasyon")
     if kanal:
-        try:
-            await kanal.send(f"📤 **{member.name}** sunucudan ayrıldı.")
-        except:
-            pass
+        await kanal.send(f"📤 **{member.name}** sunucudan ayrıldı.")
 
 
 # ==========================================
-# 4. ÖZEL ODA YÖNETİMİ & SEVİYE SİSTEMİ
+# 4. ÖZEL ODA YÖNETİM ARAYÜZÜ (VIEWS)
 # ==========================================
 
 class OdaIsimModal(discord.ui.Modal, title="Oda İsmini Değiştir"):
@@ -409,56 +290,7 @@ async def odapanel(ctx):
         color=discord.Color.blurple(),
     )
     await ctx.send(embed=embed, view=OdaYonimView())
-    try:
-        await ctx.message.delete()
-    except:
-        pass
-
-
-@bot.command(name="level", aliases=["seviye"])
-async def seviye_paneli(ctx):
-    veri = kullanici_veri_al(ctx.author.id)
-    lvl = veri["level"]
-    xp = veri["xp"]
-    
-    dolu_blok = int(xp // 10)
-    bos_blok = 10 - dolu_blok
-    bar = "🟩" * dolu_blok + "⬛" * bos_blok
-    
-    rutbe = "Rookie"
-    if lvl >= 50: rutbe = "Diamond"
-    elif lvl >= 40: rutbe = "Emerald"
-    elif lvl >= 30: rutbe = "Gold"
-    elif lvl >= 20: rutbe = "Silver"
-    elif lvl >= 10: rutbe = "Copper"
-
-    embed = discord.Embed(
-        title="📊 LEVEL & PROGRESS SYSTEM / SEVİYE SİSTEMİ",
-        description=f"**Player / Oyuncu:** {ctx.author.mention}\n**Rank / Rütbe:** `{rutbe}`",
-        color=discord.Color.blurple()
-    )
-    
-    embed.add_field(
-        name="📈 Progress / İlerleme",
-        value=f"Level: **{lvl}** | XP: `{xp}/100`\n[{bar}] {xp}%",
-        inline=False
-    )
-    
-    gorevler = veri["gorevler"]
-    embed.add_field(
-        name="📋 Daily Quests / Günlük Görevler (24s)",
-        value=(
-            f"1️⃣ Sohbet 10 Mesaj: `{gorevler.get('mesaj', 0)}/10` (+100 XP)\n"
-            f"2️⃣ Polis 5 İşlem: `{gorevler.get('polis', 0)}/5` (+100 XP)\n"
-            f"3️⃣ Ses 15 Dakika: `{gorevler.get('ses', 0)}/15` (+100 XP)\n"
-            f"4️⃣ 1000 Coin Gönder: `{gorevler.get('gonder', 0)}/1` (+100 XP)\n"
-            f"5️⃣ Rulet Min 1000 Bahis: `{gorevler.get('rulet', 0)}/1` (+100 XP)"
-        ),
-        inline=False
-    )
-    
-    embed.set_footer(text="Günlük maksimum 5 level sınırı aktiftir. / Daily max 5 level limit active.")
-    await ctx.send(embed=embed)
+    await ctx.message.delete()
 
 
 # ==========================================
@@ -469,8 +301,8 @@ async def seviye_paneli(ctx):
 async def cuzdan(ctx):
     bakiye = bakiye_al(ctx.author.id)
     embed = discord.Embed(
-        title=f"💰 {ctx.author.name}'s Wallet",
-        description=f"Total Balance: **{bakiye:,} Coin** 🪙",
+        title=f"💰 {ctx.author.name}'s Wallet / Cüzdanı",
+        description=f"Toplam Bakiye / Total Balance: **{bakiye:,} Coin** 🪙",
         color=discord.Color.gold(),
     )
     await ctx.send(embed=embed)
@@ -488,8 +320,8 @@ async def gunluk(ctx):
             kalan_saat = kalan_saniye // 3600
             kalan_dakika = (kalan_saniye % 3600) // 60
             await ctx.send(
-                f"⏳ You already claimed your daily reward!\n"
-                f"Remaining time: **{kalan_saat} hours {kalan_dakika} minutes** ⏰"
+                f"⏳ Günlük ödülünü zaten almışsın! / You already claimed your daily reward!\n"
+                f"Kalan süre / Remaining time: **{kalan_saat} saat {kalan_dakika} dakika** ⏰"
             )
             return
 
@@ -499,22 +331,22 @@ async def gunluk(ctx):
     verileri_kaydet()
 
     await ctx.send(
-        f"🎁 Daily reward of **200 Coins** added!\n"
-        f"New balance: **{COINLER[user_id]:,} Coin** 🪙"
+        f"🎁 Günlük ödülün olan **200 Coin** eklendi! / Daily reward added!\n"
+        f"Yeni bakiye / New balance: **{COINLER[user_id]:,} Coin** 🪙"
     )
 
 
 @bot.command(name="top", aliases=["cüzdansıralama"], description="En zengin ilk 5 kişiyi gösterir.")
 async def top(ctx):
     if not COINLER:
-        await ctx.send("❌ No registered wallets found!")
+        await ctx.send("❌ Kayıtlı cüzdan bulunamadı!")
         return
 
     sirali_liste = sorted(COINLER.items(), key=lambda item: item[1], reverse=True)
 
     embed = discord.Embed(
-        title="🏆 Rich List (Top 5)",
-        description="Top 5 richest wallet holders:",
+        title="🏆 Sunucu Zenginler Listesi (Top 5)",
+        description="En yüksek bakiyeye sahip ilk 5 üye:",
         color=discord.Color.gold(),
     )
 
@@ -522,8 +354,8 @@ async def top(ctx):
 
     for i, (user_id, bakiye) in enumerate(sirali_liste[:5]):
         kullanici = ctx.guild.get_member(user_id)
-        isim = kullanici.name if kullanici else f"Unknown User (`{user_id}`)"
-        embed.add_field(name=f"{medyalar[i]} {isim}", value=f"Balance: **{bakiye:,} Coin** 🪙", inline=False)
+        isim = kullanici.name if kullanici else f"Bilinmeyen Üye (`{user_id}`)"
+        embed.add_field(name=f"{medyalar[i]} {isim}", value=f"Bakiye: **{bakiye:,} Coin** 🪙", inline=False)
 
     await ctx.send(embed=embed)
 
@@ -532,7 +364,7 @@ async def top(ctx):
 @commands.has_permissions(administrator=True)
 async def paraekle(ctx, kullanici: discord.Member, miktar: int):
     if miktar <= 0:
-        await ctx.send("❌ You must enter an amount greater than 0!")
+        await ctx.send("❌ 0'dan büyük bir miktar girmelisin!")
         return
 
     user_id = kullanici.id
@@ -541,8 +373,8 @@ async def paraekle(ctx, kullanici: discord.Member, miktar: int):
     verileri_kaydet()
 
     await ctx.send(
-        f"✅ Added **{miktar:,} Coins** to **{kullanici.name}**!\n"
-        f"New balance: **{COINLER[user_id]:,} Coin** 🪙"
+        f"✅ **{kullanici.name}** kullanıcısına **{miktar:,} Coin** eklendi!\n"
+        f"Yeni bakiyesi: **{COINLER[user_id]:,} Coin** 🪙"
     )
 
 
@@ -550,7 +382,7 @@ async def paraekle(ctx, kullanici: discord.Member, miktar: int):
 @commands.has_permissions(administrator=True)
 async def parasil(ctx, kullanici: discord.Member, miktar: int):
     if miktar <= 0:
-        await ctx.send("❌ You must enter an amount greater than 0!")
+        await ctx.send("❌ 0'dan büyük bir miktar girmelisin!")
         return
 
     user_id = kullanici.id
@@ -559,8 +391,8 @@ async def parasil(ctx, kullanici: discord.Member, miktar: int):
     verileri_kaydet()
 
     await ctx.send(
-        f"✅ Removed **{miktar:,} Coins** from **{kullanici.name}**!\n"
-        f"New balance: **{COINLER[user_id]:,} Coin** 🪙"
+        f"✅ **{kullanici.name}** kullanıcısının cüzdanından **{miktar:,} Coin** silindi!\n"
+        f"Yeni bakiyesi: **{COINLER[user_id]:,} Coin** 🪙"
     )
 
 
@@ -568,19 +400,19 @@ async def parasil(ctx, kullanici: discord.Member, miktar: int):
 async def gonder(ctx, hedef: discord.Member, miktar: int):
     kanal_adi = ctx.channel.name.lower()
     if not any(k in kanal_adi for k in ["komutlar", "rulet", "blackjack", "commands"]):
-        await ctx.send("❌ You can only use this command in command/gamble channels!")
+        await ctx.send("❌ Bu komutu sadece belirlenen komut/kumar kanallarında kullanabilirsin!")
         return
 
     if miktar <= 0:
-        await ctx.send("❌ You must enter an amount greater than 0!")
+        await ctx.send("❌ 0'dan büyük miktar girmelisin!")
         return
 
     if hedef.id == ctx.author.id:
-        await ctx.send("❌ You cannot send coins to yourself!")
+        await ctx.send("❌ Kendine coin gönderemezsin!")
         return
 
     if hedef.bot:
-        await ctx.send("❌ You cannot send coins to bots!")
+        await ctx.send("❌ Botlara coin gönderemezsin!")
         return
 
     gonderen_id = ctx.author.id
@@ -588,7 +420,7 @@ async def gonder(ctx, hedef: discord.Member, miktar: int):
     gonderen_bakiye = bakiye_al(gonderen_id)
 
     if gonderen_bakiye < miktar:
-        await ctx.send(f"❌ Not enough coins! Your balance: **{gonderen_bakiye:,} Coin** 🪙")
+        await ctx.send(f"❌ Yeterli coinin yok! Bakiyen: **{gonderen_bakiye:,} Coin** 🪙")
         return
 
     COINLER[gonderen_id] -= miktar
@@ -596,19 +428,12 @@ async def gonder(ctx, hedef: discord.Member, miktar: int):
     COINLER[hedef_id] += miktar
     verileri_kaydet()
 
-    veri = kullanici_veri_al(gonderen_id)
-    if miktar >= 1000 and veri["gorevler"]["gonder"] < 1:
-        veri["gorevler"]["gonder"] += 1
-        veri["xp"] += 100
-        await ctx.send(f"✅ {ctx.author.mention}, **Money Transfer Quest** completed! `+100 XP` earned.")
-        verileri_kaydet()
-
     embed = discord.Embed(
-        title="💸 Transfer Successful",
-        description=f"**{ctx.author.mention}** -> **{hedef.mention}**\nSuccessfully transferred **{miktar:,} Coins**! 🪙",
+        title="💸 Coin Transferi Başarılı / Transfer Successful",
+        description=f"**{ctx.author.mention}** -> **{hedef.mention}**\n**{miktar:,} Coin** başarıyla aktarıldı! 🪙",
         color=discord.Color.green(),
     )
-    embed.add_field(name="New Balance", value=f"**{COINLER[gonderen_id]:,} Coin**", inline=True)
+    embed.add_field(name="Yeni Bakiyen / New Balance", value=f"**{COINLER[gonderen_id]:,} Coin**", inline=True)
     await ctx.send(embed=embed)
 
 
@@ -627,21 +452,23 @@ MARKET_ESYALARI = {
 @bot.command(name="market", aliases=["shop"], description="Market ürünlerini listeler.")
 async def market(ctx):
     embed = discord.Embed(
-        title="🛒 Server Market",
+        title="🛒 Server Market / Sunucu Marketi",
         description=(
-            "You can purchase special roles, custom color perks, or mystery boxes!\n"
-            "To buy: `!buy <item_no>` or `!satınal <item_no>`"
+            "**TR:** Coinlerinizle özel rol, renk yetkisi veya gizemli kasa satın alabilirsiniz!\n"
+            "Satın almak için: `!satınal <ürün_no>`\n\n"
+            "**EN:** Purchase special roles, custom colors, or mystery boxes with coins!\n"
+            "To buy: `!buy <item_no>`"
         ),
         color=discord.Color.gold(),
     )
 
     for id, esya in MARKET_ESYALARI.items():
         if esya["tip"] == "rol":
-            detay = f"Type: **Special Role**\nPrice: **{esya['fiyat']:,} Coin** 🪙"
+            detay = f"Tür / Type: **Special Role**\nFiyat / Price: **{esya['fiyat']:,} Coin** 🪙"
         elif esya["tip"] == "ozel_renk":
-            detay = f"Type: **Custom Color** (`!colour <hex>`)\nPrice: **{esya['fiyat']:,} Coin** 🪙"
+            detay = f"Tür / Type: **Custom Color** (`!colour <hex>`)\nFiyat / Price: **{esya['fiyat']:,} Coin** 🪙"
         else:
-            detay = f"Type: **Mystery Box** (750-1250 Coin Reward)\nPrice: **{esya['fiyat']:,} Coin** 🪙"
+            detay = f"Tür / Type: **Mystery Box** (750-1250 Coin Reward)\nFiyat / Price: **{esya['fiyat']:,} Coin** 🪙"
 
         embed.add_field(name=f"[{id}] {esya['isim']}", value=detay, inline=False)
 
@@ -651,7 +478,7 @@ async def market(ctx):
 @bot.command(name="satınal", aliases=["buy"], description="Marketten ürün satın alır.")
 async def satinal(ctx, urun_id: str):
     if urun_id not in MARKET_ESYALARI:
-        await ctx.send("❌ Invalid item ID! To view shop: `!market`")
+        await ctx.send("❌ Geçersiz ürün ID'si! Görmek için: `!market`")
         return
 
     esya = MARKET_ESYALARI[urun_id]
@@ -659,51 +486,56 @@ async def satinal(ctx, urun_id: str):
     bakiye = bakiye_al(user_id)
 
     if bakiye < esya["fiyat"]:
-        await ctx.send(f"❌ Not enough coins! Required: **{esya['fiyat']:,} Coin**, You have: **{bakiye:,} Coin** 🪙")
+        await ctx.send(f"❌ Yeterli coinin yok! Gerekli: **{esya['fiyat']:,} Coin**, Sende olan: **{bakiye:,} Coin** 🪙")
         return
 
+    # 1. Standart Rol
     if esya["tip"] == "rol":
         rol = discord.utils.get(ctx.guild.roles, name=esya["rol"])
         if not rol:
-            await ctx.send(f"⚠️ Role **{esya['rol']}** not found on server!")
+            await ctx.send(f"⚠️ Sunucuda **{esya['rol']}** isimli rol bulunamadı! Yetkililere ulaşın.")
             return
 
         if rol in ctx.author.roles:
-            await ctx.send("❌ You already have this role!")
+            await ctx.send("❌ Bu role zaten sahipsin!")
             return
 
         try:
             COINLER[user_id] -= esya["fiyat"]
             verileri_kaydet()
             await ctx.author.add_roles(rol)
-            await ctx.send(f"🎉 Congrats! Purchased **{esya['isim']}** for **{esya['fiyat']:,} Coins**!")
+            await ctx.send(f"🎉 Tebrikler! **{esya['fiyat']:,} Coin** ödeyerek **{esya['isim']}** rolünü satın aldın!")
         except Exception as e:
-            await ctx.send(f"❌ Error adding role: {e}")
+            await ctx.send(f"❌ Rol verilirken hata oluştu: {e}")
 
+    # 2. Özel Renk (En altta oluşturulur)
     elif esya["tip"] == "ozel_renk":
         rol_adi = f"Renk | {ctx.author.name}"
         mevcut_rol = discord.utils.get(ctx.author.roles, name=rol_adi)
         if mevcut_rol:
-            await ctx.send("❌ You already have a custom color role! Use `!colour <hex>` to change.")
+            await ctx.send("❌ Zaten renk rolün var! Değiştirmek için: `!colour <hex>`")
             return
 
         try:
             COINLER[user_id] -= esya["fiyat"]
             verileri_kaydet()
 
-            yeni_rol = await ctx.guild.create_role(name=rol_adi, reason=f"Custom color for {ctx.author}.")
+            yeni_rol = await ctx.guild.create_role(name=rol_adi, reason=f"{ctx.author} için renk rolü.")
             await ctx.author.add_roles(yeni_rol)
             await ctx.send(
-                f"🎉 Congrats! Purchased Custom Color privilege!\n"
-                f"✨ **{rol_adi}** role created. Use `!colour #HEXCODE` to change your color!"
+                f"🎉 Tebrikler! **{esya['fiyat']:,} Coin** ödeyerek renk hakkı aldın!\n"
+                f"✨ **{rol_adi}** rolün oluşturuldu. `!colour #HEXKODU` yazarak rengini ayarla!"
             )
+        except discord.Forbidden:
+            await ctx.send("❌ Botun yetkisi yetersiz!")
         except Exception as e:
-            await ctx.send(f"❌ Error: {e}")
+            await ctx.send(f"❌ Hata: {e}")
 
+    # 3. Şans Kasası
     elif esya["tip"] == "kasa":
         try:
             COINLER[user_id] -= esya["fiyat"]
-            kasa_mesaj = await ctx.send(f"🎁 **{ctx.author.mention}** is opening the Mystery Box... 📦✨")
+            kasa_mesaj = await ctx.send(f"🎁 **{ctx.author.mention}**, Gizemli Kasa'yı açıyor... 📦✨")
             await asyncio.sleep(1.5)
 
             kazanc = random.randint(750, 1250)
@@ -711,20 +543,20 @@ async def satinal(ctx, urun_id: str):
             verileri_kaydet()
 
             fark = kazanc - esya["fiyat"]
-            durum_metni = f"Profit! 🎉 (+{fark})" if fark > 0 else (f"Loss... 😅 ({fark})" if fark < 0 else "Breakeven! 🔄")
+            durum_metni = f"Kâr! 🎉 (+{fark})" if fark > 0 else (f"Zarar... 😅 ({fark})" if fark < 0 else "Nötr! 🔄")
 
             embed = discord.Embed(
-                title="🎁 Mystery Box Opened!",
+                title="🎁 Gizemli Kasa Açıldı!",
                 description=(
-                    f"💰 **Reward:** `+{kazanc:,} Coin`\n"
-                    f"📊 **Status:** {durum_metni}\n"
-                    f"🪙 **Current Balance:** **{COINLER[user_id]:,} Coin**"
+                    f"💰 **Ödül:** `+{kazanc:,} Coin`\n"
+                    f"📊 **Durum:** {durum_metni}\n"
+                    f"🪙 **Güncel Bakiye:** **{COINLER[user_id]:,} Coin**"
                 ),
                 color=discord.Color.purple(),
             )
             await kasa_mesaj.edit(content=None, embed=embed)
         except Exception as e:
-            await ctx.send(f"❌ Error opening box: {e}")
+            await ctx.send(f"❌ Kasa açılırken hata: {e}")
 
 
 @bot.command(name="renk", aliases=["colour", "color"], description="Renk rolünün rengini değiştirir.")
@@ -732,7 +564,7 @@ async def renk_degistir(ctx, hex_kodu: str):
     hedef_rol = next((rol for rol in ctx.author.roles if rol.name.startswith("Renk | ")), None)
 
     if not hedef_rol:
-        await ctx.send("❌ You don't have a custom color role! Buy from shop: `!market`")
+        await ctx.send("❌ Renk rolün yok! Marketten almak için: `!market`")
         return
 
     hex_kodu = hex_kodu.strip()
@@ -742,12 +574,12 @@ async def renk_degistir(ctx, hex_kodu: str):
     try:
         temiz_kod = hex_kodu.replace("#", "")
         renk_degeri = int(temiz_kod, 16)
-        await hedef_rol.edit(color=discord.Color(renk_degeri), reason=f"{ctx.author} updated color.")
-        await ctx.send(f"🎨 Success! Color updated to **{hex_kodu}**!")
+        await hedef_rol.edit(color=discord.Color(renk_degeri), reason=f"{ctx.author} rengini güncelledi.")
+        await ctx.send(f"🎨 Başarılı! Rengin **{hex_kodu}** olarak güncellendi!")
     except ValueError:
-        await ctx.send("❌ Invalid hex code! Ex: `!colour #ff0000`")
+        await ctx.send("❌ Geçersiz hex kodu! Örn: `!colour #ff0000`")
     except Exception as e:
-        await ctx.send(f"❌ Error: {e}")
+        await ctx.send(f"❌ Hata: {e}")
 
 
 # ==========================================
@@ -757,47 +589,62 @@ async def renk_degistir(ctx, hex_kodu: str):
 @bot.command(name="rulet", description="Rulet oynarsın.")
 async def rulet(ctx, renk: str, miktar: int):
     if "rulet" not in ctx.channel.name.lower():
-        await ctx.send("❌ You can only use this command in the **🎰rulet** channel!")
+        await ctx.send("❌ Bu komut sadece **🎰rulet** kanalında kullanılabilir!")
         return
 
     renk = renk.lower()
     if renk not in ["kırmızı", "siyah", "yeşil"]:
-        await ctx.send("❌ Invalid color! Options: `kırmızı`, `siyah`, `yeşil`")
+        await ctx.send("❌ Geçersiz renk! Seçenekler: `kırmızı`, `siyah`, `yeşil`")
         return
 
     if miktar <= 0:
-        await ctx.send("❌ You must enter an amount greater than 0!")
+        await ctx.send("❌ 0'dan büyük miktar girmelisin!")
         return
 
     user_id = ctx.author.id
     bakiye = bakiye_al(user_id)
 
     if bakiye < miktar:
-        await ctx.send(f"❌ Not enough coins! Your balance: **{bakiye:,} Coin** 🪙")
+        await ctx.send(f"❌ Yeterli coinin yok! Bakiyen: **{bakiye:,} Coin** 🪙")
         return
 
-    # Görev kontrolü ve kayıt güvencesi
-    veri = kullanici_veri_al(user_id)
-    if miktar >= 1000 and veri["gorevler"].get("rulet", 0) < 1:
-        veri["gorevler"]["rulet"] = 1
-        veri["xp"] += 100
-        verileri_kaydet()
-        await ctx.send(f"✅ {ctx.author.mention}, **Roulette Quest** completed! `+100 XP` earned.")
+    # Ses efekti kontrolü
+    vc = ctx.guild.voice_client
+    if ctx.author.voice and ctx.author.voice.channel:
+        ses_kanali = ctx.author.voice.channel
+        if vc is None:
+            try:
+                vc = await ses_kanali.connect()
+            except Exception as e:
+                print(f"Ses kanalına bağlanma hatası: {e}")
+
+    ses_dosyasi_yolu = "rulet_sesi.m4a"
+    if vc and os.path.exists(ses_dosyasi_yolu):
+        try:
+            source = discord.FFmpegPCMAudio(ses_dosyasi_yolu, options="-vn")
+            def ses_bitti(error):
+                fut = asyncio.run_coroutine_threadsafe(vc.disconnect(), bot.loop)
+                try:
+                    fut.result()
+                except Exception as e:
+                    print(f"Çıkış hatası: {e}")
+
+            if not vc.is_playing():
+                vc.play(source, after=ses_bitti)
+        except Exception as e:
+            print(f"Ses oynatma hatası: {e}")
 
     animasyon_embed = discord.Embed(
-        title="🎰 Roulette Wheel Spinning...",
-        description="Wheel is spinning... 🔄",
+        title="🎰 Rulet Çarkı Dönüyor...",
+        description="Top dönüyor... 🔄",
         color=discord.Color.blurple(),
     )
     mesaj = await ctx.send(embed=animasyon_embed)
 
-    for adim in ["🔴 Red...", "⚫ Black...", "🟢 Green...", "🔴 Red...", "⚫ Black..."]:
-        animasyon_embed.description = f"Wheel is spinning fast: **{adim}** 🎲"
-        try:
-            await mesaj.edit(embed=animasyon_embed)
-        except Exception:
-            pass
-        await asyncio.sleep(0.5)
+    for adim in ["🔴 Kırmızı...", "⚫ Siyah...", "🟢 Yeşil...", "🔴 Kırmızı...", "⚫ Siyah..."]:
+        animasyon_embed.description = f"Top hızla dönüyor: **{adim}** 🎲"
+        await mesaj.edit(embed=animasyon_embed)
+        await asyncio.sleep(0.6)
 
     sonuclar = ["kırmızı"] * 47 + ["siyah"] * 47 + ["yeşil"] * 6
     gelen_renk = random.choice(sonuclar)
@@ -808,25 +655,22 @@ async def rulet(ctx, renk: str, miktar: int):
             kazanc = miktar * 14
             COINLER[user_id] += kazanc - miktar
             embed.color = discord.Color.green()
-            embed.title = "🎉 AMAZING! GREEN HIT!"
-            embed.description = f"🟢 Green hit! You won **{kazanc:,} Coins**! 🚀\nNew balance: **{COINLER[user_id]:,} Coin**"
+            embed.title = "🎉 İNANILMAZ! YEŞİL GELDİ!"
+            embed.description = f"🟢 Yeşil çıktı! **{kazanc:,} Coin** kazandın! 🚀\nGüncel bakiye: **{COINLER[user_id]:,} Coin**"
         else:
             kazanc = miktar * 2
             COINLER[user_id] += kazanc - miktar
             embed.color = discord.Color.gold()
-            embed.title = "✨ YOU WON!"
-            embed.description = f"**{gelen_renk.capitalize()}** hit! You won **{kazanc:,} Coins**! 💰\nNew balance: **{COINLER[user_id]:,} Coin**"
+            embed.title = "✨ KAZANDIN!"
+            embed.description = f"**{gelen_renk.capitalize()}** çıktı! **{kazanc:,} Coin** kazandın! 💰\nGüncel bakiye: **{COINLER[user_id]:,} Coin**"
     else:
         COINLER[user_id] -= miktar
         embed.color = discord.Color.red()
-        embed.title = "💸 YOU LOST!"
-        embed.description = f"**{gelen_renk.capitalize()}** hit. You lost **{miktar:,} Coins**... 🤡\nNew balance: **{COINLER[user_id]:,} Coin**"
+        embed.title = "💸 KAYBETTİN!"
+        embed.description = f"**{gelen_renk.capitalize()}** çıktı. **{miktar:,} Coin** kaybettin... 🤡\nGüncel bakiye: **{COINLER[user_id]:,} Coin**"
 
     verileri_kaydet()
-    try:
-        await mesaj.edit(embed=embed)
-    except Exception:
-        await ctx.send(embed=embed)
+    await mesaj.edit(embed=embed)
 
 
 # --- BLACKJACK (21) ---
@@ -847,10 +691,10 @@ class BlackjackView(discord.ui.View):
             as_sayisi -= 1
         return toplam
 
-    @discord.ui.button(label="Hit", style=discord.ButtonStyle.primary, custom_id="bj_hit")
+    @discord.ui.button(label="Kart Çek (Hit)", style=discord.ButtonStyle.primary, custom_id="bj_hit")
     async def hit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.ctx.author.id:
-            await interaction.response.send_message("❌ This is not your game!", ephemeral=True)
+            await interaction.response.send_message("❌ Bu oyunu sen başlatmadın!", ephemeral=True)
             return
 
         await interaction.response.defer()
@@ -862,8 +706,8 @@ class BlackjackView(discord.ui.View):
             verileri_kaydet()
 
             embed = discord.Embed(
-                title="💥 BUSTED! (Over 21)",
-                description=f"Your Cards: {self.oy_kartlar} (Total: **{oy_toplam}**)\nYou lost **{self.miktar:,} Coins**! 💸",
+                title="💥 PATLADIN! (21'i Geçtin)",
+                description=f"Kartların: {self.oy_kartlar} (Toplam: **{oy_toplam}**)\n**{self.miktar:,} Coin** kaybettin! 💸",
                 color=discord.Color.red(),
             )
             self.stop()
@@ -871,15 +715,15 @@ class BlackjackView(discord.ui.View):
         else:
             embed = discord.Embed(
                 title="🃏 Blackjack (21)",
-                description=f"**Your Cards:** {self.oy_kartlar} (Total: **{oy_toplam}**)\n**Bot's Open Card:** [{self.bot_kartlar[0]}, ?]",
+                description=f"**Kartların:** {self.oy_kartlar} (Toplam: **{oy_toplam}**)\n**Botun Açık Kartı:** [{self.bot_kartlar[0]}, ?]",
                 color=discord.Color.blue(),
             )
             await interaction.message.edit(embed=embed, view=self)
 
-    @discord.ui.button(label="Stand", style=discord.ButtonStyle.success, custom_id="bj_stand")
+    @discord.ui.button(label="Dur (Stand)", style=discord.ButtonStyle.success, custom_id="bj_stand")
     async def stand_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.ctx.author.id:
-            await interaction.response.send_message("❌ This is not your game!", ephemeral=True)
+            await interaction.response.send_message("❌ Bu oyunu sen başlatmadın!", ephemeral=True)
             return
 
         await interaction.response.defer()
@@ -889,33 +733,33 @@ class BlackjackView(discord.ui.View):
         oy_toplam = self.kart_toplam(self.oy_kartlar)
         bot_toplam = self.kart_toplam(self.bot_kartlar)
         user_id = self.ctx.author.id
-        embed = discord.Embed(title="🃏 Blackjack Result")
+        embed = discord.Embed(title="🃏 Blackjack Sonucu")
 
         if bot_toplam > 21 or oy_toplam > bot_toplam:
             COINLER[user_id] += self.miktar
             embed.color = discord.Color.green()
-            embed.title = "🎉 YOU WON!"
+            embed.title = "🎉 KAZANDIN!"
             embed.description = (
-                f"**Your Cards:** {self.oy_kartlar} (Total: **{oy_toplam}**)\n"
-                f"**Bot's Cards:** {self.bot_kartlar} (Total: **{bot_toplam}**)\n\n"
-                f"You won **+{self.miktar:,} Coins**! 💰"
+                f"**Kartların:** {self.oy_kartlar} (Toplam: **{oy_toplam}**)\n"
+                f"**Botun Kartları:** {self.bot_kartlar} (Toplam: **{bot_toplam}**)\n\n"
+                f"**+{self.miktar:,} Coin** kazandın! 💰"
             )
         elif oy_toplam < bot_toplam:
             COINLER[user_id] -= self.miktar
             embed.color = discord.Color.red()
-            embed.title = "💸 YOU LOST!"
+            embed.title = "💸 KAYBETTİN!"
             embed.description = (
-                f"**Your Cards:** {self.oy_kartlar} (Total: **{oy_toplam}**)\n"
-                f"**Bot's Cards:** {self.bot_kartlar} (Total: **{bot_toplam}**)\n\n"
-                f"You lost **-{self.miktar:,} Coins**! 🤡"
+                f"**Kartların:** {self.oy_kartlar} (Toplam: **{oy_toplam}**)\n"
+                f"**Botun Kartları:** {self.bot_kartlar} (Toplam: **{bot_toplam}**)\n\n"
+                f"**-{self.miktar:,} Coin** kaybettin! 🤡"
             )
         else:
             embed.color = discord.Color.gold()
-            embed.title = "🤝 TIE!"
+            embed.title = "🤝 BERABERE!"
             embed.description = (
-                f"**Your Cards:** {self.oy_kartlar} (Total: **{oy_toplam}**)\n"
-                f"**Bot's Cards:** {self.bot_kartlar} (Total: **{bot_toplam}**)\n\n"
-                f"Coins refunded."
+                f"**Kartların:** {self.oy_kartlar} (Toplam: **{oy_toplam}**)\n"
+                f"**Botun Kartları:** {self.bot_kartlar} (Toplam: **{bot_toplam}**)\n\n"
+                f"Coin iade edildi."
             )
 
         verileri_kaydet()
@@ -926,18 +770,18 @@ class BlackjackView(discord.ui.View):
 @bot.command(name="blackjack", aliases=["bj", "21"], description="Blackjack oynarsın.")
 async def blackjack(ctx, miktar: int):
     if "blackjack" not in ctx.channel.name.lower():
-        await ctx.send("❌ You can only use this command in the **🃏blackjack** channel!")
+        await ctx.send("❌ Bu komut sadece **🃏blackjack** kanalında kullanılabilir!")
         return
 
     if miktar <= 0:
-        await ctx.send("❌ You must enter a valid bet amount!")
+        await ctx.send("❌ 0'dan büyük bahis girmelisin!")
         return
 
     user_id = ctx.author.id
     bakiye = bakiye_al(user_id)
 
     if bakiye < miktar:
-        await ctx.send(f"❌ Not enough coins! Your balance: **{bakiye:,} Coin** 🪙")
+        await ctx.send(f"❌ Yeterli coinin yok! Bakiyen: **{bakiye:,} Coin** 🪙")
         return
 
     deste = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11] * 4
@@ -950,9 +794,9 @@ async def blackjack(ctx, miktar: int):
     embed = discord.Embed(
         title="🃏 Blackjack (21)",
         description=(
-            f"**Your Cards:** {oy_kartlar} (Total: **{view.kart_toplam(oy_kartlar)}**)\n"
-            f"**Bot's Open Card:** [{bot_kartlar[0]}, ?]\n\n"
-            f"Do you want to Hit or Stand?"
+            f"**Kartların:** {oy_kartlar} (Toplam: **{view.kart_toplam(oy_kartlar)}**)\n"
+            f"**Botun Açık Kartı:** [{bot_kartlar[0]}, ?]\n\n"
+            f"Kart çekmek mi istersin, durmak mı?"
         ),
         color=discord.Color.blue(),
     )
@@ -964,27 +808,27 @@ async def blackjack(ctx, miktar: int):
 async def aviator(ctx, miktar: int = None):
     izin_verilen_kanal = "✈️aviator"
     if ctx.channel.name != izin_verilen_kanal:
-        await ctx.send(f"❌ This command can only be used in **#{izin_verilen_kanal}**!", delete_after=5)
+        await ctx.send(f"❌ Bu komut sadece **#{izin_verilen_kanal}** kanalında kullanılabilir!", delete_after=5)
         return
 
     user_id = ctx.author.id
     MAKS_BAHIS = 10000
 
     if miktar is None or miktar <= 0:
-        await ctx.send("❌ Please enter a valid amount! Ex: `!aviator 100`")
+        await ctx.send("❌ Lütfen geçerli miktar gir! Örn: `!aviator 100`")
         return
 
     if miktar > MAKS_BAHIS:
-        await ctx.send(f"⚠️ Maximum bet is **{MAKS_BAHIS:,} Coins**.")
+        await ctx.send(f"⚠️ Maksimum bahis **{MAKS_BAHIS:,} Coin** kadardır.")
         return
 
     bakiye = bakiye_al(user_id)
     if bakiye < miktar:
-        await ctx.send(f"❌ Not enough coins! Wallet: **{bakiye:,} Coin**")
+        await ctx.send(f"❌ Yeterli coinin yok! Cüzdan: **{bakiye:,} Coin**")
         return
 
     if user_id in DEVAM_EDEN_AVIATORLER:
-        await ctx.send("❌ You already have an active game!")
+        await ctx.send("❌ Zaten devam eden bir oyunun var!")
         return
 
     COINLER[user_id] -= miktar
@@ -1000,11 +844,11 @@ async def aviator(ctx, miktar: int = None):
             super().__init__(timeout=30)
             self.value = False
 
-        @discord.ui.button(label="💸 CASH OUT!", style=discord.ButtonStyle.green, emoji="🚀")
+        @discord.ui.button(label="💸 PARAYI ÇEK!", style=discord.ButtonStyle.green, emoji="🚀")
         async def parayi_cek(self, interaction: discord.Interaction, button: discord.ui.Button):
             nonlocal kazandi_mi
             if interaction.user.id != user_id:
-                await interaction.response.send_message("❌ This is not your game!", ephemeral=True)
+                await interaction.response.send_message("❌ Bu oyun senin değil!", ephemeral=True)
                 return
 
             if not kazandi_mi:
@@ -1017,11 +861,11 @@ async def aviator(ctx, miktar: int = None):
 
     view = AviatorView()
     embed = discord.Embed(
-        title="✈️ AVIATOR - Flight Simulation",
+        title="✈️ AVIATOR - Uçuş Simülasyonu",
         description=(
-            "🚀 **Plane taking off...**\n\n"
+            "🚀 **Uçak kalkış yapıyor...**\n\n"
             "```text\n 1.00x | ✈️ . . . . . . . . . . .\n       | ─────────────────────────\n```\n"
-            f"**Bet:** {miktar:,} Coin\n📈 **Multiplier:** `{carpan:.2f}x`"
+            f"**Bahis:** {miktar:,} Coin\n📈 **Anlık Çarpan:** `{carpan:.2f}x`"
         ),
         color=discord.Color.gold()
     )
@@ -1043,9 +887,9 @@ async def aviator(ctx, miktar: int = None):
             kalan_bosluk = " . " * (9 - oran)
 
             embed.description = (
-                f"✈️ **Plane climbing higher!**\n\n"
+                f"✈️ **Uçak tırmanmaya devam ediyor!**\n\n"
                 f"```text\n {carpan:.2f}x |{bosluk}✈️{kalan_bosluk}\n       | ─────────────────────────\n```\n"
-                f"**Bet:** {miktar:,} Coin\n📈 **Multiplier:** `{carpan:.2f}x`"
+                f"**Bahis:** {miktar:,} Coin\n📈 **Anlık Çarpan:** `{carpan:.2f}x`"
             )
             await mesaj.edit(embed=embed, view=view)
 
@@ -1054,40 +898,42 @@ async def aviator(ctx, miktar: int = None):
             COINLER[user_id] += kazanc
             verileri_kaydet()
 
-            embed.title = "🎉 SUCCESSFUL CASH OUT!"
+            embed.title = "🎉 BAŞARILI TAHLİYE!"
             embed.color = discord.Color.green()
             embed.description = (
-                f"You cashed out in time!\n\n"
-                f"✨ **Multiplier:** `{carpan:.2f}x`\n"
-                f"💰 **Won:** **+{kazanc:,} Coin**\n"
-                f"🏦 **New Wallet:** `{COINLER[user_id]:,} Coin`"
+                f"Parayı zamanında çektin!\n\n"
+                f"✨ **Çarpan:** `{carpan:.2f}x`\n"
+                f"💰 **Kazanılan:** **+{kazanc:,} Coin**\n"
+                f"🏦 **Yeni Cüzdan:** `{COINLER[user_id]:,} Coin`"
             )
             await mesaj.edit(embed=embed, view=None)
         else:
             verileri_kaydet()
-            embed.title = "💥 PLANE CRASHED (BOOM)!"
+            embed.title = "💥 UÇAK KAÇTI (BOOM)!"
             embed.color = discord.Color.red()
             embed.description = (
-                f"Plane flew away at `{patlama_noktasi}x`.\n\n"
-                f"```text\n 💥 BOOM! | ✈️💨 (Disappeared)\n```\n"
-                f"💸 **Lost:** `{miktar:,} Coin`\n"
-                f"🏦 **Remaining Wallet:** `{COINLER[user_id]:,} Coin`"
+                f"Uçak `{patlama_noktasi}x` oranında gözden kayboldu.\n\n"
+                f"```text\n 💥 BOOM! | ✈️💨 (Gözden kayboldu)\n```\n"
+                f"💸 **Kaybedilen:** `{miktar:,} Coin`\n"
+                f"🏦 **Kalan Cüzdan:** `{COINLER[user_id]:,} Coin`"
             )
             await mesaj.edit(embed=embed, view=None)
 
     except Exception as e:
-        print(f"Aviator error: {e}")
+        print(f"Aviator hatası: {e}")
     finally:
         DEVAM_EDEN_AVIATORLER.discard(user_id)
 
 
 # ==========================================
-# 8. MESLEK SİSTEMİ (SEVİYE KISITLAMALI)
+# 8. MESLEK SİSTEMİ (GLOBAL)
 # ==========================================
+
+GECERLI_MESLEKLER = ["police", "pilot", "doctor"]
 
 async def kanal_kontrol(ctx):
     if "meslekler" not in ctx.channel.name.lower() and "jobs" not in ctx.channel.name.lower():
-        await ctx.send("❌ You can only use this command in the **🥼meslekler / 💼jobs** channel!")
+        await ctx.send("❌ Bu komutu sadece **🥼meslekler / 💼jobs** kanalında kullanabilirsin!")
         return False
     return True
 
@@ -1098,20 +944,22 @@ async def meslekler_komut(ctx):
         return
 
     embed = discord.Embed(
-        title="🥼 Server Jobs Panel / Sunucu Meslekler Paneli",
+        title="🥼 Sunucu Meslekler Paneli 2.0 / Server Jobs Panel 2.0",
         description=(
-            "**TR:** Güncel meslekler, gereksinimler ve oranlar:\n"
-            "* Seçmek için: `!meslekseç <police/pilot/doctor>`\n"
+            "**TR:** Güncellenen meslek oranları:\n"
+            "* Meslek seçmek için: `!meslekseç <police/pilot/doctor>`\n"
+            "* Bekleme süresi: **3 dakika**\n"
             "* İstifa: `!istifa`\n\n"
-            "**EN:** Updated jobs and requirements:\n"
-            "* Choose: `!joinjob <police/pilot/doctor>`\n"
+            "**EN:** Updated job system:\n"
+            "* Choose job: `!joinjob <police/pilot/doctor>`\n"
+            "* Cooldown: **3 minutes**\n"
             "* Resign: `!quitjob`"
         ),
         color=discord.Color.blue(),
     )
-    embed.add_field(name="👮 Police", value="Her seviye. (Kazan: +550 | Kaybet: -250)", inline=False)
-    embed.add_field(name="✈️ Pilot", value="Min **Level 10**. (Kazan: +1,750 | Kaybet: 10 Dakika Yasak)", inline=False)
-    embed.add_field(name="👨‍⚕️ Doctor", value="Min **Level 20**. (Kazan: +2,500 | Kaybet: -750 Coin)", inline=False)
+    embed.add_field(name="👮 Police / Polis", value="`!police` veya `!polis` (Kazan: +550 | Kaybet: -250)", inline=False)
+    embed.add_field(name="👨‍⚕️ Doctor / Doktor", value="`!doctor` veya `!doktor` (Kazan: +1,000 | Kaybet: -%5 Cüzdan)", inline=False)
+    embed.add_field(name="✈️ Pilot", value="`!pilot` (Kazan: +1,000 | Kaybet: 10 Dk Uçuş Yasağı)", inline=False)
     await ctx.send(embed=embed)
 
 
@@ -1121,28 +969,33 @@ async def mesleksec(ctx, *, meslek_adi: str):
         return
 
     meslek_adi = meslek_adi.lower()
-    veri = kullanici_veri_al(ctx.author.id)
-    kullanici_level = veri["level"]
+    user_id = str(ctx.author.id)
 
     if meslek_adi not in GECERLI_MESLEKLER:
-        await ctx.send("❌ Invalid job! Options: `police`, `pilot`, `doctor`")
+        await ctx.send("❌ Geçersiz meslek! Seçenekler: `police`, `pilot`, `doctor`")
         return
 
-    if meslek_adi == "pilot" and kullanici_level < 10:
-        await ctx.send(f"❌ You must be at least **Level 10** to choose Pilot! (Current: {kullanici_level})")
-        return
-    if meslek_adi == "doctor" and kullanici_level < 20:
-        await ctx.send(f"❌ You must be at least **Level 20** to choose Doctor! (Current: {kullanici_level})")
-        return
+    simdiki_zaman = datetime.datetime.now().timestamp()
+
+    if user_id in MESLEKLER_VERI:
+        son_degisim = MESLEKLER_VERI[user_id].get("son_degisim", 0)
+        gecen_sure = simdiki_zaman - son_degisim
+        if gecen_sure < 86400:
+            kalan_sure = int(86400 - gecen_sure)
+            saat = kalan_sure // 3600
+            dakika = (kalan_sure % 3600) // 60
+            await ctx.send(f"⏳ Yeni meslek değiştirmek için **{saat} saat {dakika} dakika** beklemelisin!")
+            return
 
     rol_mapping = {"police": "Police", "doctor": "Doctor", "pilot": "Pilot"}
     rol_ismi = rol_mapping.get(meslek_adi, meslek_adi.capitalize())
     hedef_rol = discord.utils.get(ctx.guild.roles, name=rol_ismi)
 
     if not hedef_rol:
-        await ctx.send(f"⚠️ Role **{rol_ismi}** not found on server!")
+        await ctx.send(f"⚠️ Sunucuda **{rol_ismi}** isimli rol bulunamadı!")
         return
 
+    # Eski Rolleri Temizle
     for diger_meslek in GECERLI_MESLEKLER:
         diger_rol_ismi = rol_mapping.get(diger_meslek, diger_meslek.capitalize())
         diger_rol = discord.utils.get(ctx.guild.roles, name=diger_rol_ismi)
@@ -1150,23 +1003,23 @@ async def mesleksec(ctx, *, meslek_adi: str):
             try:
                 await ctx.author.remove_roles(diger_rol)
             except Exception as e:
-                print(f"Old role removal error: {e}")
+                print(f"Eski rol silme hatası: {e}")
 
     try:
         await ctx.author.add_roles(hedef_rol)
     except Exception as e:
-        await ctx.send(f"❌ Could not assign role: {e}")
+        await ctx.send(f"❌ Rol verilemedi: {e}")
         return
 
-    user_id_str = str(ctx.author.id)
-    if user_id_str not in MESLEKLER_VERI:
-        MESLEKLER_VERI[user_id_str] = {}
+    if user_id not in MESLEKLER_VERI:
+        MESLEKLER_VERI[user_id] = {}
 
-    MESLEKLER_VERI[user_id_str]["meslek"] = meslek_adi
-    MESLEKLER_VERI[user_id_str]["cezali"] = False
+    MESLEKLER_VERI[user_id]["meslek"] = meslek_adi
+    MESLEKLER_VERI[user_id]["son_degisim"] = simdiki_zaman
+    MESLEKLER_VERI[user_id]["cezali"] = False
     verileri_kaydet()
 
-    await ctx.send(f"🎉 Congrats! You are now a **{rol_ismi}**!")
+    await ctx.send(f"🎉 Tebrikler! Başarıyla **{rol_ismi}** oldun!")
 
 
 @bot.command(name="istifa", aliases=["quitjob"], description="Meslekten ayrılır.")
@@ -1174,9 +1027,9 @@ async def istifa_komut(ctx):
     if not await kanal_kontrol(ctx):
         return
 
-    user_id_str = str(ctx.author.id)
-    if user_id_str not in MESLEKLER_VERI or not MESLEKLER_VERI[user_id_str].get("meslek"):
-        await ctx.send("❌ You don't have an active job!")
+    user_id = str(ctx.author.id)
+    if user_id not in MESLEKLER_VERI or not MESLEKLER_VERI[user_id].get("meslek"):
+        await ctx.send("❌ Zaten bir mesleğin yok!")
         return
 
     rol_mapping = {"police": "Police", "doctor": "Doctor", "pilot": "Pilot"}
@@ -1187,13 +1040,13 @@ async def istifa_komut(ctx):
             try:
                 await ctx.author.remove_roles(rol)
             except Exception as e:
-                print(f"Resign role removal error: {e}")
+                print(f"İstifa rol silme hatası: {e}")
 
-    MESLEKLER_VERI[user_id_str]["meslek"] = None
-    MESLEKLER_VERI[user_id_str]["cezali"] = False
+    MESLEKLER_VERI[user_id]["meslek"] = None
+    MESLEKLER_VERI[user_id]["cezali"] = False
     verileri_kaydet()
 
-    await ctx.send(f"💼 **{ctx.author.mention}** successfully resigned.")
+    await ctx.send(f"💼 **{ctx.author.mention}** başarıyla istifa etti. 24 saat bekleme süresi başladı.")
 
 
 @bot.command(name="polis", aliases=["police"], description="Polis görevi.")
@@ -1201,46 +1054,38 @@ async def polis_komut(ctx):
     if not await kanal_kontrol(ctx):
         return
 
-    user_id_str = str(ctx.author.id)
-    if user_id_str not in MESLEKLER_VERI or MESLEKLER_VERI[user_id_str].get("meslek") != "police":
-        await ctx.send("❌ You are not a police officer! Use `!joinjob police`")
+    user_id = str(ctx.author.id)
+    if user_id not in MESLEKLER_VERI or MESLEKLER_VERI[user_id].get("meslek") != "police":
+        await ctx.send("❌ Polis değilsin! Olmak için: `!joinjob police`")
         return
 
     simdiki_zaman = datetime.datetime.now().timestamp()
-    son_polis_islem = MESLEKLER_VERI[user_id_str].get("son_polis_islem", 0)
+    son_polis_islem = MESLEKLER_VERI[user_id].get("son_polis_islem", 0)
     cooldown_suresi = 180
 
     if simdiki_zaman - son_polis_islem < cooldown_suresi:
         kalan = int(cooldown_suresi - (simdiki_zaman - son_polis_islem))
-        await ctx.send(f"⏳ Cooldown remaining: **{kalan // 60} minutes {kalan % 60} seconds**")
+        await ctx.send(f"⏳ Beklemelisin: **{kalan // 60} dakika {kalan % 60} saniye**")
         return
 
-    MESLEKLER_VERI[user_id_str]["son_polis_islem"] = simdiki_zaman
+    MESLEKLER_VERI[user_id]["son_polis_islem"] = simdiki_zaman
     verileri_kaydet()
-    bakiye_al(ctx.author.id)
-
-    veri = kullanici_veri_al(ctx.author.id)
-    if veri["gorevler"]["polis"] < 5:
-        veri["gorevler"]["polis"] += 1
-        if veri["gorevler"]["polis"] == 5:
-            veri["xp"] += 100
-            await ctx.send(f"✅ {ctx.author.mention}, **Police Quest** completed! `+100 XP` earned.")
-        verileri_kaydet()
+    bakiye_al(int(user_id))
 
     if random.choice([True, False]):
-        COINLER[ctx.author.id] += 550
+        COINLER[int(user_id)] += 550
         verileri_kaydet()
         embed = discord.Embed(
-            title="🚨 Criminal Caught!",
-            description=f"**{ctx.author.mention}** caught the criminal!\n🎉 **+550 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            title="🚨 Suçlu Yakalandı!",
+            description=f"**{ctx.author.mention}** suçluyu yakaladı!\n🎉 **+550 Coin** | Bakiye: **{COINLER[int(user_id)]:,} Coin**",
             color=discord.Color.green(),
         )
     else:
-        COINLER[ctx.author.id] = max(0, COINLER[ctx.author.id] - 250)
+        COINLER[int(user_id)] = max(0, COINLER[int(user_id)] - 250)
         verileri_kaydet()
         embed = discord.Embed(
-            title="🏃 Criminal Escaped!",
-            description=f"**{ctx.author.mention}** lost the suspect!\n💸 **-250 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            title="🏃 Suçlu Kaçtı!",
+            description=f"**{ctx.author.mention}** suçluyu elinden kaçırdı!\n💸 **-250 Coin** | Bakiye: **{COINLER[int(user_id)]:,} Coin**",
             color=discord.Color.red(),
         )
     await ctx.send(embed=embed)
@@ -1251,38 +1096,40 @@ async def doktor_komut(ctx):
     if not await kanal_kontrol(ctx):
         return
 
-    user_id_str = str(ctx.author.id)
-    if user_id_str not in MESLEKLER_VERI or MESLEKLER_VERI[user_id_str].get("meslek") != "doctor":
-        await ctx.send("❌ You are not a doctor! Use `!joinjob doctor`")
+    user_id = str(ctx.author.id)
+    if user_id not in MESLEKLER_VERI or MESLEKLER_VERI[user_id].get("meslek") != "doctor":
+        await ctx.send("❌ Doktor değilsin! Olmak için: `!joinjob doctor`")
         return
 
     simdiki_zaman = datetime.datetime.now().timestamp()
-    son_doktor_islem = MESLEKLER_VERI[user_id_str].get("son_doktor_islem", 0)
+    son_doktor_islem = MESLEKLER_VERI[user_id].get("son_doktor_islem", 0)
     cooldown_suresi = 180
 
     if simdiki_zaman - son_doktor_islem < cooldown_suresi:
         kalan = int(cooldown_suresi - (simdiki_zaman - son_doktor_islem))
-        await ctx.send(f"⏳ Cooldown remaining: **{kalan // 60} minutes {kalan % 60} seconds**")
+        await ctx.send(f"⏳ Beklemelisin: **{kalan // 60} dakika {kalan % 60} saniye**")
         return
 
-    MESLEKLER_VERI[user_id_str]["son_doktor_islem"] = simdiki_zaman
+    MESLEKLER_VERI[user_id]["son_doktor_islem"] = simdiki_zaman
     verileri_kaydet()
-    bakiye_al(ctx.author.id)
+    bakiye_al(int(user_id))
 
     if random.choice([True, False]):
-        COINLER[ctx.author.id] += 2500
+        COINLER[int(user_id)] += 1000
         verileri_kaydet()
         embed = discord.Embed(
-            title="🏥 Successful Surgery!",
-            description=f"**{ctx.author.mention}** saved the patient!\n🎉 **+2,500 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            title="🏥 Başarılı Ameliyat!",
+            description=f"**{ctx.author.mention}** hastayı kurtardı!\n🎉 **+1,000 Coin** | Bakiye: **{COINLER[int(user_id)]:,} Coin**",
             color=discord.Color.green(),
         )
     else:
-        COINLER[ctx.author.id] = max(0, COINLER[ctx.author.id] - 750)
+        mevcut_bakiye = COINLER[int(user_id)]
+        kesinti = int(mevcut_bakiye * 0.05)
+        COINLER[int(user_id)] = max(0, mevcut_bakiye - kesinti)
         verileri_kaydet()
         embed = discord.Embed(
-            title="💔 Failed Surgery!",
-            description=f"**{ctx.author.mention}** lost the patient.\n💸 **-750 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            title="💔 Başarısız Ameliyat!",
+            description=f"**{ctx.author.mention}** ameliyatı tamamlayamadı.\n💸 **-%5 Kesinti (-{kesinti:,} Coin)** | Bakiye: **{COINLER[int(user_id)]:,} Coin**",
             color=discord.Color.red(),
         )
     await ctx.send(embed=embed)
@@ -1293,47 +1140,47 @@ async def pilot_komut(ctx):
     if not await kanal_kontrol(ctx):
         return
 
-    user_id_str = str(ctx.author.id)
-    if user_id_str not in MESLEKLER_VERI or MESLEKLER_VERI[user_id_str].get("meslek") != "pilot":
-        await ctx.send("❌ You are not a pilot! Use `!joinjob pilot`")
+    user_id = str(ctx.author.id)
+    if user_id not in MESLEKLER_VERI or MESLEKLER_VERI[user_id].get("meslek") != "pilot":
+        await ctx.send("❌ Pilot değilsin! Olmak için: `!joinjob pilot`")
         return
 
     simdiki_zaman = datetime.datetime.now().timestamp()
-    son_islem = MESLEKLER_VERI[user_id_str].get("son_islem", 0)
+    son_islem = MESLEKLER_VERI[user_id].get("son_islem", 0)
 
-    yasak_suresi = 600 if MESLEKLER_VERI[user_id_str].get("cezali", False) else 0
+    yasak_suresi = 600 if MESLEKLER_VERI[user_id].get("cezali", False) else 0
     if yasak_suresi > 0 and simdiki_zaman - son_islem < yasak_suresi:
         kalan = int(yasak_suresi - (simdiki_zaman - son_islem))
-        await ctx.send(f"⏳ Flight ban active! Remaining: **{kalan // 60} minutes {kalan % 60} seconds**")
+        await ctx.send(f"⏳ Uçuş yasağın devam ediyor! Kalan: **{kalan // 60} dakika {kalan % 60} saniye**")
         return
 
-    son_pilot_islem = MESLEKLER_VERI[user_id_str].get("son_pilot_islem", 0)
+    son_pilot_islem = MESLEKLER_VERI[user_id].get("son_pilot_islem", 0)
     cooldown_suresi = 180
     if simdiki_zaman - son_pilot_islem < cooldown_suresi:
         kalan = int(cooldown_suresi - (simdiki_zaman - son_pilot_islem))
-        await ctx.send(f"⏳ Maintenance cooldown: **{kalan // 60} minutes {kalan % 60} seconds**")
+        await ctx.send(f"⏳ Bakım süresi bekleniyor: **{kalan // 60} dakika {kalan % 60} saniye**")
         return
 
-    MESLEKLER_VERI[user_id_str]["son_pilot_islem"] = simdiki_zaman
-    MESLEKLER_VERI[user_id_str]["cezali"] = False
-    MESLEKLER_VERI[user_id_str]["son_islem"] = simdiki_zaman
-    bakiye_al(ctx.author.id)
+    MESLEKLER_VERI[user_id]["son_pilot_islem"] = simdiki_zaman
+    MESLEKLER_VERI[user_id]["cezali"] = False
+    MESLEKLER_VERI[user_id]["son_islem"] = simdiki_zaman
+    bakiye_al(int(user_id))
 
     if random.choice([True, False]):
-        COINLER[ctx.author.id] += 1750
+        COINLER[int(user_id)] += 1000
         verileri_kaydet()
         embed = discord.Embed(
-            title="✈️ Safe Flight!",
-            description=f"**{ctx.author.mention}** completed the flight successfully!\n🎉 **+1,750 Coin** | Balance: **{COINLER[ctx.author.id]:,} Coin**",
+            title="✈️ Güvenli Uçuş!",
+            description=f"**{ctx.author.mention}** uçuşu başarıyla tamamladı!\n🎉 **+1,000 Coin** | Bakiye: **{COINLER[int(user_id)]:,} Coin**",
             color=discord.Color.green(),
         )
     else:
-        MESLEKLER_VERI[user_id_str]["cezali"] = True
-        MESLEKLER_VERI[user_id_str]["son_islem"] = simdiki_zaman
+        MESLEKLER_VERI[user_id]["cezali"] = True
+        MESLEKLER_VERI[user_id]["son_islem"] = simdiki_zaman
         verileri_kaydet()
         embed = discord.Embed(
-            title="⚠️ Flight Cancelled!",
-            description=f"**{ctx.author.mention}** encountered bad weather conditions!\n🚫 Received a **10-minute flight ban**!",
+            title="⚠️ Uçuş İptali!",
+            description=f"**{ctx.author.mention}** tehlikeli hava koşullarıyla karşılaştı!\n🚫 **10 dakika uçuş yasağı** aldın!",
             color=discord.Color.red(),
         )
     await ctx.send(embed=embed)
@@ -1361,112 +1208,117 @@ def sure_hesapla(sayi: int, birim: str):
 async def mute(ctx, kullanici: discord.Member, sayi: int, birim: str):
     toplam_saniye = sure_hesapla(sayi, birim)
     if not toplam_saniye:
-        await ctx.send("❌ Invalid time unit! (`s`, `d`, `h`, `g`)")
+        await ctx.send("❌ Geçersiz süre birimi! (`s`, `d`, `h`, `g`)")
         return
 
     sure = datetime.timedelta(seconds=toplam_saniye)
     try:
-        await kullanici.timeout(sure, reason=f"{ctx.author} muted.")
-        await ctx.send(f"🔒 **{kullanici.mention}** successfully muted for **{sayi} {birim}**!")
+        await kullanici.timeout(sure, reason=f"{ctx.author} tarafından mutelendi.")
+        await ctx.send(f"🔒 **{kullanici.mention}** başarıyla **{sayi} {birim}** süreyle mutelendi!")
+
+        mod_kanal = discord.utils.get(ctx.guild.text_channels, name="bot-moderasyon")
+        if mod_kanal:
+            embed = discord.Embed(title="🔒 Mute Atıldı", color=discord.Color.red(), timestamp=datetime.datetime.now())
+            embed.add_field(name="Üye", value=f"{kullanici.mention} (`{kullanici.id}`)", inline=False)
+            embed.add_field(name="Yetkili", value=f"{ctx.author.mention}", inline=False)
+            embed.add_field(name="Süre", value=f"{sayi} {birim}", inline=False)
+            await mod_kanal.send(embed=embed)
     except Exception as e:
-        await ctx.send(f"Error: {e}")
+        await ctx.send(f"Hata: {e}")
 
 
 @bot.command(name="unmute", description="Mute kaldırır.")
 @commands.has_permissions(moderate_members=True)
 async def unmute(ctx, kullanici: discord.Member):
     try:
-        await kullanici.timeout(None, reason=f"{ctx.author} unmuted.")
-        await ctx.send(f"🔊 Mute removed for **{kullanici.mention}**!")
+        await kullanici.timeout(None, reason=f"{ctx.author} tarafından kaldırıldı.")
+        await ctx.send(f"🔊 **{kullanici.mention}** adlı kullanıcının mutesi kaldırıldı!")
     except Exception as e:
-        await ctx.send(f"Error: {e}")
+        await ctx.send(f"Hata: {e}")
 
 
 @bot.command(name="ban", description="Kullanıcıyı banlar.")
 @commands.has_permissions(ban_members=True)
-async def ban(ctx, kullanici: discord.Member, *, sebep: str = "Not specified"):
+async def ban(ctx, kullanici: discord.Member, *, sebep: str = "Belirtilmedi"):
     try:
         await kullanici.ban(reason=sebep)
-        await ctx.send(f"🔨 **{kullanici.name}** banned! Reason: {sebep}")
+        await ctx.send(f"🔨 **{kullanici.name}** banlandı! Sebep: {sebep}")
     except Exception as e:
-        await ctx.send(f"Error: {e}")
+        await ctx.send(f"Hata: {e}")
 
 
 @bot.command(name="kick", description="Kullanıcıyı atar.")
 @commands.has_permissions(kick_members=True)
-async def kick(ctx, kullanici: discord.Member, *, sebep: str = "Not specified"):
+async def kick(ctx, kullanici: discord.Member, *, sebep: str = "Belirtilmedi"):
     try:
         await kullanici.kick(reason=sebep)
-        await ctx.send(f"👢 **{kullanici.name}** kicked! Reason: {sebep}")
+        await ctx.send(f"👢 **{kullanici.name}** atıldı! Sebep: {sebep}")
     except Exception as e:
-        await ctx.send(f"Error: {e}")
+        await ctx.send(f"Hata: {e}")
 
 
 @bot.command(name="unban", description="ID ile ban kaldırır.")
 @commands.has_permissions(ban_members=True)
 async def unban(ctx, user_id: str):
     if not user_id.isdigit():
-        await ctx.send("❌ Please enter a valid User ID!")
+        await ctx.send("❌ Geçerli bir Kullanıcı ID'si girin!")
         return
 
     try:
         user = await bot.fetch_user(int(user_id))
         await ctx.guild.unban(user)
-        await ctx.send(f"🔓 Unbanned **{user.name}**!")
+        await ctx.send(f"🔓 **{user.name}** yasağı kaldırıldı!")
     except Exception as e:
-        await ctx.send(f"Error: {e}")
+        await ctx.send(f"Hata: {e}")
 
 
 @bot.command(name="odayaçek", aliases=["çek"], description="Kullanıcıyı odanıza çeker.")
 async def odayacek(ctx, kullanici: discord.Member):
     if not ctx.author.guild_permissions.move_members:
-        await ctx.send("❌ You don't have **Move Members** permission!")
+        await ctx.send("❌ **Üyeleri Taşı** yetkin yok!")
         return
 
     if not ctx.author.voice or not ctx.author.voice.channel:
-        await ctx.send("❌ You are not in a voice channel!")
+        await ctx.send("❌ Bir ses kanalında değilsin!")
         return
 
     if not kullanici.voice or not kullanici.voice.channel:
-        await ctx.send(f"❌ **{kullanici.name}** is not in a voice channel!")
+        await ctx.send(f"❌ **{kullanici.name}** ses kanalında değil!")
         return
 
     hedef_kanal = ctx.author.voice.channel
     try:
-        await kullanici.move_to(hedef_kanal, reason=f"{ctx.author} pulled user.")
-        await ctx.send(f"🎯 **{kullanici.mention}** moved to **{hedef_kanal.name}**!")
+        await kullanici.move_to(hedef_kanal, reason=f"{ctx.author} tarafından çekildi.")
+        await ctx.send(f"🎯 **{kullanici.mention}** -> **{hedef_kanal.name}** kanalına çekildi!")
     except Exception as e:
-        await ctx.send(f"Error: {e}")
+        await ctx.send(f"Hata: {e}")
 
 
 @bot.command(name="sil", description="Mesaj siler.")
 @commands.has_permissions(manage_messages=True)
 async def sil(ctx, sayi: int):
     if sayi <= 0:
-        await ctx.send("❌ Enter a number greater than 0!")
+        await ctx.send("❌ 0'dan büyük bir sayı girmelisin!")
         return
 
     silinen = await ctx.channel.purge(limit=sayi + 1)
-    mesaj = await ctx.send(f"🧹 Successfully deleted **{len(silinen) - 1}** messages!")
+    mesaj = await ctx.send(f"🧹 **{len(silinen) - 1}** adet mesaj silindi!")
     await asyncio.sleep(3)
-    try:
-        await mesaj.delete()
-    except:
-        pass
+    await mesaj.delete()
 
 
 @bot.command(name="kapat", description="Kanalı kilitler.")
 @commands.has_permissions(manage_channels=True)
 async def kapat(ctx):
     await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send(f"🔒 **{ctx.channel.name}** locked!")
+    await ctx.send(f"🔒 **{ctx.channel.name}** kilitlendi!")
 
 
 @bot.command(name="aç", description="Kanal kilidini açar.")
 @commands.has_permissions(manage_channels=True)
 async def ac(ctx):
     await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send(f"🔓 **{ctx.channel.name}** unlocked for messages!")
+    await ctx.send(f"🔓 **{ctx.channel.name}** mesajlara açıldı!")
 
 
 @bot.command(name="slowmode", description="Yavaş mod ayarlar.")
@@ -1475,72 +1327,11 @@ async def slowmode(ctx, saniye: int = 0):
     try:
         await ctx.channel.edit(slowmode_delay=saniye)
         if saniye == 0:
-            await ctx.send("⏱️ Slowmode removed.")
+            await ctx.send("⏱️ Yavaş mod kaldırıldı.")
         else:
-            await ctx.send(f"⏱️ Slowmode set to **{saniye}** seconds!")
+            await ctx.send(f"⏱️ Yavaş mod **{saniye}** saniye yapıldı!")
     except Exception as e:
-        await ctx.send(f"Error: {e}")
-
-
-@bot.command(name="rolver", description="Kullanıcıya rol verir.")
-@commands.has_permissions(manage_roles=True)
-async def rolver(ctx, kullanici: discord.Member, *, rol: discord.Role):
-    try:
-        await kullanici.add_roles(rol, reason=f"{ctx.author} tarafından verildi.")
-        await ctx.send(f"✅ **{kullanici.name}** adlı üyeye **{rol.name}** rolü eklendi!")
-    except Exception as e:
-        await ctx.send(f"❌ Rol verilirken bir hata oluştu: {e}")
-
-
-@bot.command(name="rolal", description="Kullanıcıdan rol alır.")
-@commands.has_permissions(manage_roles=True)
-async def rolal(ctx, kullanici: discord.Member, *, rol: discord.Role):
-    try:
-        await kullanici.remove_roles(rol, reason=f"{ctx.author} tarafından alındı.")
-        await ctx.send(f"✅ **{kullanici.name}** adlı üyenin **{rol.name}** rolü alındı!")
-    except Exception as e:
-        await ctx.send(f"❌ Rol alınırken bir hata oluştu: {e}")
-
-
-@bot.command(name="uyarıver", aliases=["warn"], description="Kullanıcıyı uyarır.")
-@commands.has_permissions(manage_messages=True)
-async def uyariver(ctx, kullanici: discord.Member, *, sebep: str = "Belirtilmedi"):
-    embed = discord.Embed(
-        title="⚠️ Uyarı Verildi",
-        color=discord.Color.yellow(),
-        timestamp=datetime.datetime.now()
-    )
-    embed.add_field(name="Uyaralan Üye", value=f"{kullanici.mention} (`{kullanici.id}`)", inline=False)
-    embed.add_field(name="Yetkili", value=f"{ctx.author.mention}", inline=False)
-    embed.add_field(name="Sebep", value=sebep, inline=False)
-    
-    await ctx.send(embed=embed)
-    try:
-        await kullanici.send(f"⚠️ **{ctx.guild.name}** sunucusunda uyarıldın!\nSebep: `{sebep}`")
-    except:
-        pass
-
-
-@bot.command(name="lockall", description="Tüm sunucuyu kilitler.")
-@commands.has_permissions(administrator=True)
-async def lockall(ctx):
-    for kanal in ctx.guild.text_channels:
-        try:
-            await kanal.set_permissions(ctx.guild.default_role, send_messages=False)
-        except:
-            pass
-    await ctx.send("🔒 Sunucudaki tüm metin kanalları kilitlendi!")
-
-
-@bot.command(name="unlockall", description="Tüm sunucu kilidini açar.")
-@commands.has_permissions(administrator=True)
-async def unlockall(ctx):
-    for kanal in ctx.guild.text_channels:
-        try:
-            await kanal.set_permissions(ctx.guild.default_role, send_messages=True)
-        except:
-            pass
-    await ctx.send("🔓 Sunucudaki tüm metin kanallarının kilidi açıldı!")
+        await ctx.send(f"Hata: {e}")
 
 
 # ==========================================
