@@ -455,7 +455,7 @@ async def market(ctx):
         title="🛒 Server Market / Sunucu Marketi",
         description=(
             "**TR:** Coinlerinizle özel rol, renk yetkisi veya gizemli kasa satın alabilirsiniz!\n"
-            "Satın almak için: `!satınal <ürün_no>` veya `!buy <ürün_no>`\n\n"
+            "Satın almak için: `!satınal <ürün_no>`\n\n"
             "**EN:** Purchase special roles, custom colors, or mystery boxes with coins!\n"
             "To buy: `!buy <item_no>`"
         ),
@@ -1194,11 +1194,11 @@ def sure_hesapla(sayi: int, birim: str):
     birim = birim.lower()
     if birim in ["saniye", "s"]:
         return sayi
-    elif birim in ["dakika", "d"]:
+    elif birim in ["dakika", "m"]:
         return sayi * 60
     elif birim in ["saat", "h"]:
         return sayi * 3600
-    elif birim in ["gün", "g"]:
+    elif birim in ["gün", "d"]:
         return sayi * 86400
     return None
 
@@ -1208,7 +1208,7 @@ def sure_hesapla(sayi: int, birim: str):
 async def mute(ctx, kullanici: discord.Member, sayi: int, birim: str):
     toplam_saniye = sure_hesapla(sayi, birim)
     if not toplam_saniye:
-        await ctx.send("❌ Geçersiz süre birimi! (`s`, `d`, `h`, `g`)")
+        await ctx.send("❌ Geçersiz süre birimi! (`s`, `m`, `h`, `d`)")
         return
 
     sure = datetime.timedelta(seconds=toplam_saniye)
