@@ -455,7 +455,7 @@ async def market(ctx):
         title="🛒 Server Market / Sunucu Marketi",
         description=(
             "**TR:** Coinlerinizle özel rol, renk yetkisi veya gizemli kasa satın alabilirsiniz!\n"
-            "Satın almak için: `!satınal <ürün_no>`\n\n"
+            "Satın almak için: `!satınal <ürün_no>` veya `!buy <ürün_no>`\n\n"
             "**EN:** Purchase special roles, custom colors, or mystery boxes with coins!\n"
             "To buy: `!buy <item_no>`"
         ),
@@ -947,9 +947,9 @@ async def meslekler_komut(ctx):
         title="🥼 Sunucu Meslekler Paneli 2.0 / Server Jobs Panel 2.0",
         description=(
             "**TR:** Güncellenen meslek oranları:\n"
-            "* Meslek seçmek için: `!meslekseç <police/pilot/doctor>`\n"
+            "* Meslek seçmek için: `!meslekseç <police/pilot/doctor>` veya `!joinjob`\n"
             "* Bekleme süresi: **3 dakika**\n"
-            "* İstifa: `!istifa`\n\n"
+            "* İstifa: `!istifa` veya `!quitjob`\n\n"
             "**EN:** Updated job system:\n"
             "* Choose job: `!joinjob <police/pilot/doctor>`\n"
             "* Cooldown: **3 minutes**\n"
