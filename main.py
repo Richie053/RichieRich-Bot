@@ -59,7 +59,10 @@ def verileri_yukle():
                     user_id_int = int(k)
                     
                     if v.get("son_gunluk"):
-                        sureler[user_id_int] = datetime.datetime.fromisoformat(v["son_gunluk"])
+                        try:
+                            sureler[user_id_int] = datetime.datetime.fromisoformat(v["son_gunluk"])
+                        except:
+                            pass
                     
                     if v.get("meslek_bilgi"):
                         meslekler_veri[user_id_str] = v["meslek_bilgi"]
@@ -99,7 +102,7 @@ def verileri_kaydet():
             }
 
         veriler[user_id_str] = {
-            "bakiye": COINLER.get(user_id, 0),
+            "bakiye": COINLER.get(user_id, 500),
             "son_gunluk": GUNLUK_SURELER[user_id].isoformat() if user_id in GUNLUK_SURELER else None,
             "meslek_bilgi": MESLEKLER_VERI.get(user_id_str, {}),
             "xp": SEVIYE_VERI[user_id_str].get("xp", 0),
@@ -109,11 +112,13 @@ def verileri_kaydet():
             "gorevler": SEVIYE_VERI[user_id_str].get("gorevler", {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0})
         }
 
-    with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
-        json.dump(veriler, f, ensure_ascii=False, indent=4)
+    try:
+        with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
+            json.dump(veriler, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"⚠️ Veri kaydedilirken hata: {e}")
 
 
-# Bot kapanırken verilerin kaybolmaması için otomatik kayıt tetikleyicisi
 atexit.register(verileri_kaydet)
 
 COINLER, GUNLUK_SURELER, MESLEKLER_VERI, SEVIYE_VERI = verileri_yukle()
@@ -136,7 +141,6 @@ def kullanici_veri_al(user_id):
             "gorevler": {"mesaj": 0, "polis": 0, "ses": 0, "gonder": 0, "rulet": 0}
         }
     else:
-        # Tarih değiştiğinde SADECE günlük limit ve görevler sıfırlanır (XP ve Level kesinlikle silinmez)
         if SEVIYE_VERI[user_id_str].get("son_sifirlama") != bugun:
             SEVIYE_VERI[user_id_str]["son_sifirlama"] = bugun
             SEVIYE_VERI[user_id_str]["gunluk_level"] = 0
@@ -210,7 +214,10 @@ async def xp_ekle(message, miktar):
             description=f"Congratulations {message.author.mention}, you reached **Level {yeni_level}**!\n\nTebrikler, **{yeni_level}. Seviye** oldunuz!\n\n{odul_mesaji}",
             color=discord.Color.gold()
         )
-        await message.channel.send(embed=embed)
+        try:
+            await message.channel.send(embed=embed)
+        except:
+            pass
 
     verileri_kaydet()
 
@@ -252,7 +259,10 @@ async def on_message(message):
     if any(k in mesaj_icerik for k in kural_anahtar_kelimeleri):
         kurallar_kanali = discord.utils.get(message.guild.text_channels, name="📝kurallar")
         if kurallar_kanali:
-            await message.reply(f"📜 Sunucu kuralları için {kurallar_kanali.mention} kanalını ziyaret edebilirsiniz!")
+            try:
+                await message.reply(f"📜 Sunucu kuralları için {kurallar_kanali.mention} kanalını ziyaret edebilirsiniz!")
+            except:
+                pass
 
     if message.channel.name == "💬genel-sohbet":
         await xp_ekle(message, 20)
@@ -261,7 +271,10 @@ async def on_message(message):
             veri["gorevler"]["mesaj"] += 1
             if veri["gorevler"]["mesaj"] == 10:
                 veri["xp"] += 100
-                await message.channel.send(f"✅ {message.author.mention}, **Genel Sohbet Görevi / General Chat Quest** tamamlandı! `+100 XP` kazandın.")
+                try:
+                    await message.channel.send(f"✅ {message.author.mention}, **Genel Sohbet Görevi / General Chat Quest** tamamlandı! `+100 XP` kazandın.")
+                except:
+                    pass
             verileri_kaydet()
 
     await bot.process_commands(message)
@@ -307,14 +320,20 @@ async def on_member_join(member):
 
     kanal = discord.utils.get(member.guild.text_channels, name="bot-moderasyon")
     if kanal:
-        await kanal.send(f"📥 **{member.mention}** ({member.name}) sunucuya katıldı! '{rol_adi}' rolü verildi.")
+        try:
+            await kanal.send(f"📥 **{member.mention}** ({member.name}) sunucuya katıldı! '{rol_adi}' rolü verildi.")
+        except:
+            pass
 
 
 @bot.event
 async def on_member_remove(member):
     kanal = discord.utils.get(member.guild.text_channels, name="bot-moderasyon")
     if kanal:
-        await kanal.send(f"📤 **{member.name}** sunucudan ayrıldı.")
+        try:
+            await kanal.send(f"📤 **{member.name}** sunucudan ayrıldı.")
+        except:
+            pass
 
 
 # ==========================================
@@ -390,7 +409,10 @@ async def odapanel(ctx):
         color=discord.Color.blurple(),
     )
     await ctx.send(embed=embed, view=OdaYonimView())
-    await ctx.message.delete()
+    try:
+        await ctx.message.delete()
+    except:
+        pass
 
 
 @bot.command(name="level", aliases=["seviye"])
@@ -734,6 +756,7 @@ async def renk_degistir(ctx, hex_kodu: str):
 
 @bot.command(name="rulet", description="Rulet oynarsın.")
 async def rulet(ctx, renk: str, miktar: int):
+    # Kanal adında "rulet" geçiyorsa çalışmasına izin verilir
     if "rulet" not in ctx.channel.name.lower():
         await ctx.send("❌ You can only use this command in the **🎰rulet** channel!")
         return
@@ -754,9 +777,10 @@ async def rulet(ctx, renk: str, miktar: int):
         await ctx.send(f"❌ Not enough coins! Your balance: **{bakiye:,} Coin** 🪙")
         return
 
+    # Görev kontrolü ve XP güncellemesi güvenli hale getirildi
     veri = kullanici_veri_al(user_id)
-    if miktar >= 1000 and veri["gorevler"]["rulet"] < 1:
-        veri["gorevler"]["rulet"] += 1
+    if miktar >= 1000 and veri["gorevler"].get("rulet", 0) < 1:
+        veri["gorevler"]["rulet"] = 1
         veri["xp"] += 100
         await ctx.send(f"✅ {ctx.author.mention}, **Roulette Quest** completed! `+100 XP` earned.")
 
@@ -769,7 +793,10 @@ async def rulet(ctx, renk: str, miktar: int):
 
     for adim in ["🔴 Red...", "⚫ Black...", "🟢 Green...", "🔴 Red...", "⚫ Black..."]:
         animasyon_embed.description = f"Wheel is spinning fast: **{adim}** 🎲"
-        await mesaj.edit(embed=animasyon_embed)
+        try:
+            await mesaj.edit(embed=animasyon_embed)
+        except:
+            pass
         await asyncio.sleep(0.6)
 
     sonuclar = ["kırmızı"] * 47 + ["siyah"] * 47 + ["yeşil"] * 6
@@ -796,7 +823,10 @@ async def rulet(ctx, renk: str, miktar: int):
         embed.description = f"**{gelen_renk.capitalize()}** hit. You lost **{miktar:,} Coins**... 🤡\nNew balance: **{COINLER[user_id]:,} Coin**"
 
     verileri_kaydet()
-    await mesaj.edit(embed=embed)
+    try:
+        await mesaj.edit(embed=embed)
+    except:
+        await ctx.send(embed=embed)
 
 
 # --- BLACKJACK (21) ---
@@ -1419,7 +1449,10 @@ async def sil(ctx, sayi: int):
     silinen = await ctx.channel.purge(limit=sayi + 1)
     mesaj = await ctx.send(f"🧹 Successfully deleted **{len(silinen) - 1}** messages!")
     await asyncio.sleep(3)
-    await mesaj.delete()
+    try:
+        await mesaj.delete()
+    except:
+        pass
 
 
 @bot.command(name="kapat", description="Kanalı kilitler.")
